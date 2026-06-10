@@ -1,1 +1,3 @@
-.vercel\n.env.local\nnode_modules
+.vercel
+.env*
+node_modules

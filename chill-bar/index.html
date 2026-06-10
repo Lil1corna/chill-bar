@@ -1,1 +1,423 @@
 
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHILL BAR - Menu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;700&family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --chill-dark-1: #0a0a0a;
+            --chill-dark-2: #111111;
+            --chill-gold: #F3C06B;
+            --chill-crimson: #6F2232;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--chill-dark-1); }
+        ::-webkit-scrollbar-thumb { background: var(--chill-gold); border-radius: 4px; border: 2px solid var(--chill-dark-1); }
+        ::-webkit-scrollbar-thumb:hover { background: #e0ac5c; }
+        body { font-family: 'Oswald', sans-serif; letter-spacing: 0.03em; background-color: var(--chill-dark-1); color: #e5e7eb; }
+        .logo-font { font-family: 'Pacifico', cursive; }
+        .hero-bg {
+            background-image: linear-gradient(to bottom, rgba(10, 10, 10, 0.7), rgba(10, 10, 10, 1)), url('https://images.unsplash.com/photo-1579751626658-9218d69191d8?q=80&w=1974&auto=format&fit=crop');
+            background-size: cover; background-position: center; background-attachment: fixed;
+        }
+        .hero-bg h1 { text-shadow: 0 0 15px rgba(243, 192, 107, 0.6), 0 0 30px rgba(243, 192, 107, 0.3); }
+        .glass-card { background: rgba(17, 17, 17, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(243, 192, 107, 0.2); transition: all 0.3s ease; }
+        .glass-card:hover { border-color: rgba(243, 192, 107, 0.5); box-shadow: 0 0 20px rgba(243, 192, 107, 0.2); transform: scale(1.02); }
+        .neon-glow { box-shadow: 0 0 10px rgba(243, 192, 107, 0.4), 0 0 20px rgba(243, 192, 107, 0.2); }
+        .nav-link { position: relative; transition: color 0.3s ease; color: #9ca3af; }
+        .nav-link.active, .nav-link:hover { color: var(--chill-gold); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .fade-in { animation: fadeIn 0.8s ease-out forwards; } .slide-up { animation: slideUp 0.6s ease-out forwards; }
+        .skeleton { background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite linear; border-radius: 0.75rem; }
+        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .price-editable { cursor: pointer; border: 1px dashed var(--chill-gold); padding: 2px 4px; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-[var(--chill-dark-1)] text-gray-200">
+
+    <div id="edit-mode-bar" class="fixed top-0 left-0 right-0 bg-[var(--chill-gold)] text-[var(--chill-dark-1)] text-center py-3 px-4 z-[100] hidden font-bold shadow-lg flex items-center justify-between">
+        <span id="edit-mode-text"></span>
+        <button onclick="app.admin.disablePriceEdit()" id="edit-mode-btn" class="bg-black text-white px-4 py-1.5 rounded-xl text-xs uppercase tracking-wider hover:opacity-80 transition-opacity"></button>
+    </div>
+
+    <div class="fixed top-4 left-4 z-[60] flex space-x-2">
+        <div id="lang-switcher" class="glass-card p-1 flex space-x-1 rounded-xl">
+            <button onclick="app.changeLanguage('ru')" id="btn-ru" class="lang-btn px-2.5 py-1 text-xs font-bold rounded-lg transition-all"></button>
+            <button onclick="app.changeLanguage('en')" id="btn-en" class="lang-btn px-2.5 py-1 text-xs font-bold rounded-lg transition-all"></button>
+            <button onclick="app.changeLanguage('az')" id="btn-az" class="lang-btn px-2.5 py-1 text-xs font-bold rounded-lg transition-all"></button>
+        </div>
+    </div>
+
+    <header class="hero-bg relative h-[50vh] flex flex-col items-center justify-center text-center px-4 overflow-hidden border-b-2 border-[var(--chill-gold)]/30">
+        <div class="relative z-10 slide-up">
+            <h1 class="logo-font text-6xl md:text-8xl text-[var(--chill-gold)] tracking-wide mb-2">Chill Bar</h1>
+            <p id="hero-subtitle" class="text-xs uppercase tracking-[0.3em] text-amber-200/70 font-semibold"></p>
+        </div>
+        <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[var(--chill-dark-1)] to-transparent"></div>
+    </header>
+
+    <nav class="sticky top-0 z-50 bg-[var(--chill-dark-1)]/80 backdrop-blur-md py-4 px-4 my-8">
+        <div id="nav-container" class="flex space-x-6 max-w-4xl mx-auto justify-center overflow-x-auto"></div>
+    </nav>
+    
+    <main id="menu-sections" class="max-w-4xl mx-auto px-4 space-y-16"></main>
+
+    <footer class="mt-24 text-center space-y-4 pb-8">
+        <p id="footer-text" class="text-xs text-gray-500 tracking-widest uppercase"></p>
+        <button onclick="app.auth.openAdminModal()" id="admin-panel-btn" class="text-[10px] text-gray-500 hover:text-[var(--chill-gold)] transition-colors tracking-widest border border-gray-800 px-3 py-1 rounded-md">Admin Panel</button>
+    </footer>
+
+    <div id="admin-modal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-lg hidden items-center justify-center p-4" onclick="event.target === this && app.auth.closeAdminModal()">
+        <div class="glass-card p-6 rounded-2xl max-w-lg w-full border border-[var(--chill-gold)]/40 neon-glow flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center pb-4 border-b border-white/10">
+                <h3 id="adm-title" class="text-sm font-bold tracking-wider uppercase text-[var(--chill-gold)]"></h3>
+                <button onclick="app.auth.closeAdminModal()" class="text-gray-400 hover:text-[var(--chill-crimson)] transition-colors text-2xl font-semibold">&times;</button>
+            </div>
+            
+            <div id="step-login" class="py-6 space-y-4">
+                <div>
+                    <label for="admin-email" id="adm-label-email" class="block text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2"></label>
+                    <input type="email" id="admin-email" placeholder="admin@chillbar.az" class="w-full bg-[var(--chill-dark-2)] border border-white/10 focus:border-[var(--chill-gold)] p-3 rounded-lg text-sm outline-none transition-colors">
+                </div>
+                <div>
+                    <label for="admin-password" id="adm-label-pass" class="block text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2"></label>
+                    <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[var(--chill-dark-2)] border border-white/10 focus:border-[var(--chill-gold)] p-3 rounded-lg text-sm outline-none transition-colors">
+                </div>
+                <button onclick="app.auth.signIn()" id="adm-btn-login" class="w-full mt-4 bg-[var(--chill-gold)] text-[var(--chill-dark-1)] font-extrabold py-3 rounded-lg text-sm uppercase tracking-wider neon-glow hover:opacity-90 transition-opacity"></button>
+            </div>
+
+            <div id="step-dashboard" class="hidden overflow-y-auto py-4 space-y-6"></div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const SUPABASE_URL = 'https://kcfvdggrkrnifuclzknz.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjZnZkZ2dya3JuaWZ1Y2x6a256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMTg5ODAsImV4cCI6MjA5NjY5NDk4MH0.BR156uKhrWylL-7QS3DkfteI2SZZdHzfUKhtk3yy8CE';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const App = {
+        config: {
+            defaultLang: 'ru',
+            scrollOffset: -150,
+        },
+        state: {
+            currentLang: 'ru',
+            menuData: { categories: {ru:[],en:[],az:[]}, items: {ru:[],en:[],az:[]} },
+            currentUser: null,
+            db: null,
+            isPriceEditMode: false,
+        },
+
+        dom: {
+            get: (id) => document.getElementById(id),
+            query: (selector) => document.querySelector(selector),
+            queryAll: (selector) => document.querySelectorAll(selector),
+        },
+        
+        utils: {
+            sanitize(str) {
+                if (typeof str !== 'string') return '';
+                const map = {'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'};
+                return str.replace(/[<>&"']/g, c => map[c]);
+            },
+        },
+
+        data: {
+            async fetchMenu() {
+                const { data: categories, error: catError } = await App.state.db.from('categories').select('*');
+                const { data: items, error: itemsError } = await App.state.db.from('items').select('*');
+
+                if (catError || itemsError) {
+                    console.error(catError || itemsError);
+                    alert("Не удалось загрузить меню из базы данных.");
+                    return false;
+                }
+                
+                const newMenuData = { categories: { ru: [], en: [], az: [] }, items: { ru: [], en: [], az: [] } };
+                categories.forEach(cat => {
+                    newMenuData.categories.ru.push({ id: cat.id, name: cat.name_ru });
+                    newMenuData.categories.en.push({ id: cat.id, name: cat.name_en });
+                    newMenuData.categories.az.push({ id: cat.id, name: cat.name_az });
+                });
+                items.forEach(item => {
+                    const priceStr = String(Number(item.price).toFixed(2)).replace('.00', '');
+                    newMenuData.items.ru.push({ id: item.id, catId: item.category_id, name: item.name_ru, desc: item.desc_ru, price: priceStr, img: item.img_url });
+                    newMenuData.items.en.push({ id: item.id, catId: item.category_id, name: item.name_en, desc: item.desc_en, price: priceStr, img: item.img_url });
+                    newMenuData.items.az.push({ id: item.id, catId: item.category_id, name: item.name_az, desc: item.desc_az, price: priceStr, img: item.img_url });
+                });
+                
+                App.state.menuData = newMenuData;
+                return true;
+            },
+        },
+
+        auth: {
+            async signIn() {
+                const email = App.dom.get('admin-email').value;
+                const password = App.dom.get('admin-password').value;
+                const { error } = await App.state.db.auth.signInWithPassword({ email, password });
+                if (error) alert(error.message);
+            },
+            async signOut() {
+                const { error } = await App.state.db.auth.signOut();
+                if (error) alert(error.message);
+                else App.auth.closeAdminModal();
+            },
+            openAdminModal() {
+                App.dom.get('admin-modal').classList.remove('hidden');
+                App.dom.get('admin-modal').classList.add('flex');
+                const t = App.translations[App.state.currentLang];
+                App.dom.get('adm-label-email').textContent = t.admLabelEmail;
+                App.dom.get('adm-label-pass').textContent = t.admLabelPass;
+                App.dom.get('adm-btn-login').textContent = t.admBtnLogin;
+
+                if (App.state.currentUser) {
+                    App.dom.get('step-login').classList.add('hidden');
+                    App.dom.get('step-dashboard').classList.remove('hidden');
+                    App.admin.render();
+                } else {
+                    App.dom.get('step-login').classList.remove('hidden');
+                    App.dom.get('step-dashboard').classList.add('hidden');
+                }
+            },
+            closeAdminModal() { App.dom.get('admin-modal').classList.add('hidden'); },
+        },
+        
+        render: {
+            skeletons() {
+                let skeletons = '';
+                for (let i = 0; i < 3; i++) {
+                    skeletons += `<section class="space-y-6 opacity-30"><div class="h-8 w-1/3 skeleton"></div><div class="grid sm:grid-cols-2 gap-4"><div class="h-24 skeleton"></div><div class="h-24 skeleton"></div></div></section>`;
+                }
+                return skeletons;
+            },
+            nav() {
+                const container = App.dom.get('nav-container');
+                const fragment = document.createDocumentFragment();
+                const categories = App.state.menuData.categories[App.state.currentLang] || [];
+                categories.forEach(cat => {
+                    const link = document.createElement('a');
+                    link.href = `#${cat.id}`;
+                    link.className = "nav-link px-4 py-2 font-semibold uppercase tracking-wider whitespace-nowrap";
+                    link.textContent = cat.name;
+                    link.dataset.navId = cat.id;
+                    fragment.appendChild(link);
+                });
+                container.innerHTML = '';
+                container.appendChild(fragment);
+            },
+            itemCard(item) {
+                const u = App.utils;
+                const card = document.createElement('div');
+                card.className = 'glass-card flex items-center justify-between p-4';
+                const imageHtml = item.img ? `<img src="${u.sanitize(item.img)}" class="w-16 h-16 object-cover rounded-lg bg-gray-800 flex-shrink-0" alt="${u.sanitize(item.name)}" loading="lazy">` : '';
+                card.innerHTML = `
+                    <div class="flex items-center space-x-4 min-w-0 flex-grow pr-3">
+                        ${imageHtml}
+                        <div class="min-w-0">
+                            <h3 class="font-medium text-lg uppercase tracking-wide truncate">${u.sanitize(item.name)}</h3>
+                            ${item.desc ? `<p class="text-sm text-gray-400 mt-1 font-light line-clamp-2">${u.sanitize(item.desc)}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+                const priceWrapper = document.createElement('div');
+                priceWrapper.className = 'flex-shrink-0 text-right';
+                const priceSpan = document.createElement('span');
+                priceSpan.dataset.id = item.id;
+                priceSpan.dataset.price = item.price;
+                priceSpan.className = "item-price font-sans text-xl font-bold text-[var(--chill-gold)]";
+                priceSpan.innerHTML = `${u.sanitize(item.price)} <span class="text-xs font-semibold ml-0.5 opacity-90">AZN</span>`;
+                if(App.state.isPriceEditMode) {
+                    priceSpan.classList.add('price-editable');
+                    priceSpan.contentEditable = true;
+                    priceSpan.onblur = App.admin.updatePrice;
+                }
+                priceWrapper.appendChild(priceSpan);
+                card.appendChild(priceWrapper);
+                return card;
+            },
+            async fullPage() {
+                const sectionsContainer = App.dom.get('menu-sections');
+                sectionsContainer.innerHTML = App.render.skeletons();
+
+                const success = await App.data.fetchMenu();
+                if (!success) return;
+
+                requestAnimationFrame(() => {
+                    App.render.nav();
+                    const fragment = document.createDocumentFragment();
+                    const categories = App.state.menuData.categories[App.state.currentLang] || [];
+                    const items = App.state.menuData.items[App.state.currentLang] || [];
+                    categories.forEach(cat => {
+                        const section = document.createElement('section');
+                        section.id = cat.id; section.className = 'scroll-mt-24 space-y-6 fade-in';
+                        section.innerHTML = `<div class="flex items-center space-x-4"><h2 class="text-2xl font-bold uppercase tracking-wider text-[var(--chill-gold)]">${App.utils.sanitize(cat.name)}</h2><div class="h-[1px] bg-[var(--chill-gold)]/20 flex-grow"></div></div>`;
+                        const itemsGrid = document.createElement('div');
+                        itemsGrid.className = 'grid sm:grid-cols-2 gap-4';
+                        const categoryItems = items.filter(item => item.catId === cat.id);
+                        if (categoryItems.length > 0) categoryItems.forEach(item => itemsGrid.appendChild(App.render.itemCard(item)));
+                        else itemsGrid.innerHTML = `<p class="text-xs text-gray-400 italic">${App.translations[App.state.currentLang].emptyCat}</p>`;
+                        section.appendChild(itemsGrid);
+                        fragment.appendChild(section);
+                    });
+                    sectionsContainer.innerHTML = '';
+                    sectionsContainer.appendChild(fragment);
+                    App.init.animations();
+                    App.updateTexts();
+                });
+            },
+        },
+    
+        admin: {
+            render() {
+                 const t = App.translations[App.state.currentLang];
+                App.dom.get('step-dashboard').innerHTML = `
+                <div class="flex justify-end"><button id="logout-btn" class="text-xs text-red-500 uppercase hover:text-red-400">${t.admBtnLogout}</button></div>
+                <div class="glass-card p-4 rounded-lg border-none space-y-3"><h4 class="text-xs font-bold uppercase tracking-wider text-[var(--chill-gold)]">${t.admBlock1}</h4><div class="grid gap-2 sm:grid-cols-2"><input type="text" id="new-cat-id" placeholder="${t.placeholderId}" class="bg-[var(--chill-dark-2)] border-white/10 p-2 rounded-md text-xs"><input type="text" id="new-cat-name" placeholder="${t.placeholderName}" class="bg-[var(--chill-dark-2)] border-white/10 p-2 rounded-md text-xs"></div><button id="create-cat-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-md text-xs uppercase">${t.admBtnCreateCat}</button></div>
+                <div class="glass-card p-4 rounded-lg border-none space-y-3"><label class="block text-xs uppercase tracking-wider text-red-500 font-semibold">${t.admLabelDelCat}</label><div class="flex space-x-2"><select id="delete-category-select" class="flex-grow bg-[var(--chill-dark-2)] border-white/10 p-2 rounded-md text-xs"></select><button id="delete-cat-btn" class="bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white px-4 rounded-md text-xs font-bold border-red-500/30">${t.admBtnDelCat}</button></div></div>
+                <div class="glass-card p-4 rounded-lg border-none space-y-3"><h4 class="text-xs font-bold uppercase tracking-wider text-[var(--chill-gold)]">${t.admBlock2}</h4><select id="add-item-cat-select" class="w-full bg-[var(--chill-dark-2)] border-white/10 p-2 rounded-md text-xs"></select><div class="grid gap-2 sm:grid-cols-2"><input type="text" id="add-item-name" placeholder="${t.placeholderName}" class="w-full bg-[var(--chill-dark-2)] border p-2 rounded-md text-xs"><input type="text" id="add-item-price" placeholder="${t.placeholderPrice}" class="w-full bg-[var(--chill-dark-2)] border p-2 rounded-md text-xs"></div><input type="text" id="add-item-desc" placeholder="${t.placeholderDesc}" class="w-full bg-[var(--chill-dark-2)] border p-2 rounded-md text-xs"><input type="text" id="add-item-img" placeholder="${t.placeholderUrl}" class="w-full bg-[var(--chill-dark-2)] border p-2 rounded-md text-xs"><button id="add-item-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-md text-xs uppercase">${t.admBtnPublish}</button></div>
+                <div class="glass-card p-4 rounded-lg border-none space-y-3"><h4 class="text-xs font-bold uppercase tracking-wider text-[var(--chill-gold)]">${t.admBlock3}</h4><select id="delete-item-select" class="w-full bg-[var(--chill-dark-2)] p-2.5 rounded-xl text-xs"></select><button id="delete-item-btn" class="w-full bg-red-800 hover:bg-red-700 text-white font-bold py-2 rounded-md text-xs uppercase">${t.admBtnDelItem}</button></div>
+                <div class="glass-card p-4 rounded-lg border-none grid grid-cols-2 gap-3"><div><span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">${t.admLabelFastPrice}</span><button id="price-edit-btn" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 rounded-xl text-xs uppercase">${t.admBtnClickEditor}</button></div><div><span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">${t.admLabelReset}</span><button id="reset-menu-btn" class="w-full bg-neutral-800 hover:bg-red-900 text-gray-400 hover:text-white font-bold py-2 rounded-xl text-xs uppercase">${t.admBtnResetMenu}</button></div></div>`;
+
+                const cats = App.state.menuData.categories[App.state.currentLang] || [];
+                const items = App.state.menuData.items[App.state.currentLang] || [];
+                const catOpts = cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                let itemOpts = '';
+                cats.forEach(cat => { itemOpts += items.filter(i => i.catId === cat.id).map(i => `<option value="${i.id}">[${cat.name}] ${i.name}</option>`).join(''); });
+
+                App.dom.get('delete-category-select').innerHTML = catOpts; App.dom.get('add-item-cat-select').innerHTML = catOpts; App.dom.get('delete-item-select').innerHTML = itemOpts;
+                
+                App.dom.get('logout-btn').onclick = App.auth.signOut; App.dom.get('create-cat-btn').onclick = App.admin.createCategory; App.dom.get('delete-cat-btn').onclick = App.admin.deleteCategory;
+                App.dom.get('add-item-btn').onclick = App.admin.createItem; App.dom.get('delete-item-btn').onclick = App.admin.deleteItem;
+                App.dom.get('price-edit-btn').onclick = App.admin.enablePriceEdit; App.dom.get('reset-menu-btn').onclick = App.admin.resetMenu;
+            },
+            async createCategory() {
+                const id = App.dom.get('new-cat-id').value.trim(); const name = App.dom.get('new-cat-name').value.trim();
+                if (!id || !name) return alert('ID and Name are required');
+                const { error } = await App.state.db.from('categories').insert({ id, name_ru: name, name_en: name, name_az: name });
+                if (error) alert(error.message); else App.render.fullPage();
+            },
+            async deleteCategory() {
+                const catId = App.dom.get('delete-category-select').value;
+                if (!catId || !confirm('Delete category and all its items?')) return;
+                const { error } = await App.state.db.from('categories').delete().eq('id', catId);
+                if (error) alert(error.message); else App.render.fullPage();
+            },
+            async createItem() {
+                const catId = App.dom.get('add-item-cat-select').value; const name = App.dom.get('add-item-name').value.trim();
+                const price = parseFloat(App.dom.get('add-item-price').value.trim()); const desc = App.dom.get('add-item-desc').value.trim();
+                const img = App.dom.get('add-item-img').value.trim();
+                if (!name || !price) return alert('Name and Price are required');
+                const { error } = await App.state.db.from('items').insert({ category_id: catId, name_ru: name, name_en: name, name_az: name, price, desc_ru: desc, desc_en: desc, desc_az: desc, img_url: img });
+                if (error) alert(error.message); else App.render.fullPage();
+            },
+            async deleteItem() {
+                const itemId = App.dom.get('delete-item-select').value;
+                if (!itemId || !confirm('Delete item?')) return;
+                const { error } = await App.state.db.from('items').delete().eq('id', itemId);
+                if (error) alert(error.message); else App.render.fullPage();
+            },
+            async resetMenu() { /* This is now more complex, involves clearing and re-inserting. Let's just disable for now. */ alert('Reset from SQL editor for now.'); },
+            enablePriceEdit() { App.state.isPriceEditMode = true; App.dom.get('edit-mode-bar').classList.remove('hidden'); App.auth.closeAdminModal(); App.render.fullPage(); },
+            disablePriceEdit() {  App.state.isPriceEditMode = false; App.dom.get('edit-mode-bar').classList.add('hidden'); App.render.fullPage(); },
+            async updatePrice(e) {
+                const itemId = e.target.dataset.id; const newPrice = parseFloat(e.target.textContent);
+                if (!itemId || isNaN(newPrice)) return;
+                const { error } = await App.state.db.from('items').update({ price: newPrice }).eq('id', itemId);
+                if (error) alert(error.message);
+                else e.target.dataset.price = newPrice;
+            },
+        },
+    
+        changeLanguage(lang) {
+            this.state.currentLang = lang;
+            this.dom.queryAll('.lang-btn').forEach(b => b.classList.toggle('bg-[var(--chill-gold)]', b.id===`btn-${lang}`.replace));
+            localStorage.setItem('chill_bar_lang', lang);
+            this.render.fullPage();
+        },
+
+        updateTexts() {
+            const t = App.translations[this.state.currentLang];
+            this.dom.get('hero-subtitle').textContent = t.heroSubtitle;
+            this.dom.get('footer-text').textContent = t.footer;
+            this.dom.get('adm-title').textContent = t.admTitle;
+            this.dom.get('edit-mode-text').textContent = t.editModeText;
+            this.dom.get('edit-mode-btn').textContent = t.editModeBtn;
+        },
+
+        init: {
+            async once() {
+                const savedLang = localStorage.getItem('chill_bar_lang');
+                if (savedLang && App.translations[savedLang]) App.state.currentLang = savedLang;
+                
+                App.state.db.auth.onAuthStateChange((_event, session) => { App.state.currentUser = session?.user || null; 
+ App.auth.openAdminModal(); });
+                const { data: { session } } = await App.state.db.auth.getSession();
+                App.state.currentUser = session?.user || null;
+
+                App.init.events();
+                await App.render.fullPage();
+            },
+            animations() {
+                App.dom.queryAll('a[href^="#"]').forEach(a => a.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = App.dom.query(this.getAttribute('href'));
+                    if(target) window.scrollTo({ top: target.getBoundingClientRect().top + window.pageYOffset + App.config.scrollOffset, behavior: "smooth"});
+                }));
+                const obs = new IntersectionObserver((es) => es.forEach(e => { if(e.isIntersecting) App.dom.queryAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.navId === e.target.id))}), { rootMargin: "0px 0px -70% 0px" });
+                App.dom.queryAll('#menu-sections > section').forEach(s => obs.observe(s));
+            },
+            events() {
+                App.dom.get('admin-password').addEventListener('keydown', e => e.key === 'Enter' && App.auth.signIn());
+            }
+        },
+
+        translations: {ru:{heroSubtitle:"Premium Lounge & Меню",footer:"© 2026 CHILL BAR. Все права защищены.",admTitle:"Панель Управления",admLabelEmail:"Email",admLabelPass:"Пароль",admBtnLogin:"Войти",admBtnLogout:"Выйти",admBlock1:"Разделы меню",admBtnCreateCat:"Создать категорию",admLabelDelCat:"Удалить категорию:",admBtnDelCat:"Удалить",admBlock2:"Добавление позиции",admBtnPublish:"Опубликовать",admBlock3:"Удаление позиций",admBtnDelItem:"Удалить",admLabelFastPrice:"Клик-редактор цен",admBtnClickEditor:"Активировать",admLabelReset:"Сброс",admBtnResetMenu:"Сбросить",placeholderId:"ID (eng, no spaces)",placeholderName:"Название",placeholderPrice:"Цена",placeholderDesc:"Описание",placeholderUrl:"Ссылка на фото",emptyCat:"В этой категории пока нет позиций...",editModeText:"Режим изменения цен активен. Кликните на цену для редактирования.",editModeBtn:"Выйти"},en:{heroSubtitle:"Premium Lounge & Menu",footer:"© 2026 CHILL BAR. All rights reserved.",admTitle:"Control Panel",admLabelEmail:"Email",admLabelPass:"Password",admBtnLogin:"Login",admBtnLogout:"Logout",admBlock1:"Menu Sections",admBtnCreateCat:"Create Category",admLabelDelCat:"Delete category:",admBtnDelCat:"Delete",admBlock2:"Add New Item",admBtnPublish:"Publish",admBlock3:"Delete Items",admBtnDelItem:"Delete",admLabelFastPrice:"Quick Price Editor",admBtnClickEditor:"Activate",admLabelReset:"Reset Data",admBtnResetMenu:"Reset",placeholderId:"ID (eng, no spaces)",placeholderName:"Name",placeholderPrice:"Price",placeholderDesc:"Description",placeholderUrl:"Image URL",emptyCat:"There are no items in this category yet...",editModeText:"Price editing mode is active. Click on a price to edit.",editModeBtn:"Exit"},az:{heroSubtitle:"Premium Lounge & Menyu",footer:"© 2026 CHILL BAR. Bütün hüquqlar qorunur.",admTitle:"İdarəetmə Paneli",admLabelEmail:"Email",admLabelPass:"Şifrə",admBtnLogin:"Daxil Ol",admBtnLogout:"Çıxış",admBlock1:"Menyu Bölmələri",admBtnCreateCat:"Kateqoriya Yarat",admLabelDelCat:"Kateqoriyanı sil:",admBtnDelCat:"Sil",admBlock2:"Yeni Mövqe Əlavə Et",admBtnPublish:"Dərc Et",admBlock3:"Mövqelərin Silinməsi",admBtnDelItem:"Sil",admLabelFastPrice:"Klik-Redaktor",admBtnClickEditor:"Aktivləşdir",admLabelReset:"Sıfırlamaq",admBtnResetMenu:"Sıfırla",placeholderId:"ID (ing, boşluqsuz)",placeholderName:"Adı",placeholderPrice:"Qiymət",placeholderDesc:"Təsviri",placeholderUrl:"Şəkil linki",emptyCat:"Bu kateqoriyada hələ heç bir mövqe yoxdur...",editModeText:"Qiymət redaktə rejimi aktivdir. Redaktə etmək üçün qiymətə klikləyin.",editModeBtn:"Çıxış"}}
+    };
+    
+    
+    async function initializeSupabase() {
+        try {
+            console.log("Fetching config from /api/config...");
+            const response = await fetch('/api/config');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to fetch server config: ${response.status} ${errorText}`);
+            }
+            const config = await response.json();
+            if (config.error || !config.supabaseUrl || !config.supabaseKey) {
+                throw new Error(`Invalid config from server: ${config.error || 'Missing keys'}`);
+            }
+            console.log("Config received, initializing Supabase client...");
+            db = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+            App.state.db = db; // Сохраняем клиент в state
+            return true;
+        } catch (error) {
+            console.error('Supabase initialization failed:', error);
+            document.body.innerHTML = `<div style="color: red; text-align: center; margin-top: 50px;"><h1>Error: Could not connect to database.</h1><p style="font-size: 1.2em;">${error.message}</p><p>Please ensure environment variables (SUPABASE_URL, SUPABASE_ANON_KEY) are set correctly in your Vercel project.</p></div>`;
+            return false;
+        }
+    }
+
+    (async () => {
+        const loaded = await initializeSupabase();
+        if (loaded) {
+            window.app = App;
+            App.init.once();
+        }
+    })();
+
+});
+</script>
+</body>
+</html>
