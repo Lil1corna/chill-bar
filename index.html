@@ -101,9 +101,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
-    const SUPABASE_URL = 'https://kcfvdggrkrnifuclzknz.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjZnZkZ2dya3JuaWZ1Y2x6a256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMTg5ODAsImV4cCI6MjA5NjY5NDk4MH0.BR156uKhrWylL-7QS3DkfteI2SZZdHzfUKhtk3yy8CE';
-    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let db;
 
     const App = {
         config: {
@@ -399,7 +397,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Invalid config from server: ${config.error || 'Missing keys'}`);
             }
             console.log("Config received, initializing Supabase client...");
-            db = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+            if (!window._supabaseClient) {
+                window._supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+            }
+            db = window._supabaseClient;
             App.state.db = db; // Сохраняем клиент в state
             return true;
         } catch (error) {
