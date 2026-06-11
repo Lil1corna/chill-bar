@@ -279,17 +279,19 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   height: clamp(168px, 22vw, 218px);
   overflow: hidden;
   background:
-    linear-gradient(135deg, rgba(243,192,107,0.16), rgba(255,255,255,0.02)),
-    #090909;
+    radial-gradient(circle at 50% 35%, rgba(243,192,107,0.13), transparent 44%),
+    linear-gradient(135deg, rgba(255,255,255,0.08), rgba(243,192,107,0.035)),
+    #080a10;
 }
 .menu-photo::after {
   content: '';
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(to bottom, transparent 44%, rgba(6,8,14,0.46) 100%),
-    radial-gradient(circle at 18% 15%, rgba(243,192,107,0.16), transparent 34%);
+    linear-gradient(to bottom, rgba(4,6,10,0.08) 0%, rgba(6,8,14,0.24) 56%, rgba(6,8,14,0.62) 100%),
+    radial-gradient(circle at 18% 15%, rgba(243,192,107,0.13), transparent 34%);
   pointer-events: none;
+  z-index: 1;
 }
 .menu-photo::before {
   content: '';
@@ -299,25 +301,37 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   transform: translateX(-70%) rotate(5deg);
   opacity: 0;
   pointer-events: none;
-  z-index: 2;
+  z-index: 4;
 }
 .menu-card-photo.show:hover .menu-photo::before {
   animation: photoSheen 1.15s ease;
 }
+.menu-photo-backdrop {
+  position: absolute;
+  inset: -18px;
+  width: calc(100% + 36px);
+  height: calc(100% + 36px);
+  object-fit: cover;
+  opacity: 0.26;
+  filter: blur(20px) saturate(0.8) brightness(0.72);
+  transform: scale(1.06);
+}
 .menu-photo-img {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
-  transform: scale(1.025);
+  object-fit: contain;
+  padding: 0.7rem;
+  transform: scale(1);
   filter: saturate(0.96) contrast(1.04);
-  transition: transform 0.65s ease, filter 0.65s ease;
+  transition: filter 0.45s ease;
 }
 .menu-card-photo.show .menu-photo-img {
   animation: photoReveal 0.75s ease both;
 }
 .menu-card-photo.show:hover .menu-photo-img {
-  transform: scale(1.08);
   filter: saturate(1.05) contrast(1.08);
 }
 .menu-card-body {
@@ -381,8 +395,8 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   background: rgba(8,8,10,0.58);
 }
 @keyframes photoReveal {
-  from { opacity: 0.72; transform: scale(1.085); }
-  to { opacity: 1; transform: scale(1.025); }
+  from { opacity: 0.72; transform: scale(0.975); }
+  to { opacity: 1; transform: scale(1); }
 }
 @keyframes photoSheen {
   0% { opacity: 0; transform: translateX(-70%) rotate(5deg); }
@@ -1432,6 +1446,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.innerHTML = `
                         <div class="menu-photo">
                             ${dragHandle}
+                            <img src="${u.sanitize(item.img)}" loading="lazy" class="menu-photo-backdrop" alt="" aria-hidden="true">
                             <img src="${u.sanitize(item.img)}" loading="lazy" class="menu-photo-img" alt="${u.sanitize(item.name)}">
                         </div>
                         <div class="menu-card-body">
