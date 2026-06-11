@@ -444,6 +444,74 @@ body.light .item-desc { color: rgba(100,80,20,0.45); }
 .sortable-ghost { opacity: 0.4; }
 .drag-handle { cursor: grab; padding-right: 12px; font-size: 1.25rem; color: #F3C06B; }
 .drag-handle:active { cursor: grabbing; }
+.price-value { display: inline-block; min-width: 1ch; }
+.price-value[contenteditable="true"] { outline: none; }
+.price-saving { opacity: 0.55; pointer-events: none; }
+.btn-busy,
+.btn-busy:hover {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.btn-busy { pointer-events: none; }
+.loader-chip {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 130;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 0.7rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(243,192,107,0.25);
+  background: rgba(12,10,20,0.94);
+  color: #F3C06B;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px);
+}
+.loader-chip.show { display: flex; }
+.inline-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(243,192,107,0.2);
+  border-top-color: #F3C06B;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 140;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: min(92vw, 360px);
+}
+.toast {
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(12,10,20,0.95);
+  color: #f5f5f5;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.35);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: toastIn 0.18s ease forwards;
+}
+.toast-success { border-color: rgba(34,197,94,0.35); color: #bbf7d0; }
+.toast-error { border-color: rgba(239,68,68,0.35); color: #fecaca; }
+.toast-info { border-color: rgba(96,165,250,0.35); color: #bfdbfe; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sortable-chosen { box-shadow: 0 0 22px rgba(243,192,107,0.18); }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 </head>
@@ -529,6 +597,12 @@ body.light .item-desc { color: rgba(100,80,20,0.45); }
         </div>
     </div>
 
+    <div id="global-loader" class="loader-chip">
+        <span class="inline-spinner"></span>
+        <span id="global-loader-text">Saving...</span>
+    </div>
+    <div id="toast-container" class="toast-stack"></div>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -538,14 +612,20 @@ document.addEventListener('DOMContentLoaded', () => {
         config: {
             defaultLang: 'ru',
             scrollOffset: -80,
+            storageBucket: 'menu-images',
         },
         state: {
             currentLang: 'ru',
             menuData: { categories: {ru:[],en:[],az:[]}, items: {ru:[],en:[],az:[]} },
             currentUser: null,
             db: null,
+            supabaseConfig: { storageBucket: 'menu-images' },
             isPriceEditMode: false,
             isReorderingMode: false,
+            hasPositionColumn: null,
+            sortables: [],
+            pendingActions: new Set(),
+            loadingCount: 0,
         },
 
         dom: {
@@ -560,16 +640,153 @@ document.addEventListener('DOMContentLoaded', () => {
                 const map = {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'};
                 return str.replace(/[<>&"']/g, c => map[c]);
             },
+            formatPrice(value) {
+                const number = Number(value);
+                if (!Number.isFinite(number)) return '';
+                return number.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+            },
+            parsePriceInput(value) {
+                const raw = String(value ?? '').replace(',', '.').replace(/[^\d.]/g, '');
+                if (!raw) return NaN;
+                const firstDotIndex = raw.indexOf('.');
+                const normalized = firstDotIndex === -1
+                    ? raw
+                    : raw.slice(0, firstDotIndex + 1) + raw.slice(firstDotIndex + 1).replace(/\./g, '');
+                const [integer = '', decimal = ''] = normalized.split('.');
+                const safe = decimal ? `${integer}.${decimal.slice(0, 2)}` : integer;
+                return Number(safe);
+            },
+            normalizeEditablePrice(value) {
+                const raw = String(value ?? '').replace(',', '.').replace(/[^\d.]/g, '');
+                const firstDotIndex = raw.indexOf('.');
+                if (firstDotIndex === -1) return raw;
+                const integer = raw.slice(0, firstDotIndex);
+                const decimal = raw.slice(firstDotIndex + 1).replace(/\./g, '').slice(0, 2);
+                return decimal ? `${integer}.${decimal}` : `${integer}.`;
+            },
+            placeCaretAtEnd(element) {
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            },
+            sortItems(list) {
+                return [...list].sort((a, b) => {
+                    const catCompare = String(a.catId).localeCompare(String(b.catId), undefined, { numeric: true });
+                    if (catCompare !== 0) return catCompare;
+                    const posA = Number.isFinite(Number(a.position)) ? Number(a.position) : Number.MAX_SAFE_INTEGER;
+                    const posB = Number.isFinite(Number(b.position)) ? Number(b.position) : Number.MAX_SAFE_INTEGER;
+                    if (posA !== posB) return posA - posB;
+                    return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+                });
+            },
+            isSupportedImage(file) {
+                if (!file) return false;
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+                const extension = String(file.name || '').split('.').pop().toLowerCase();
+                return allowedTypes.includes(file.type) || allowedExtensions.includes(extension);
+            },
+            buildStoragePath(file) {
+                const extension = String(file.name || 'jpg').split('.').pop().toLowerCase() || 'jpg';
+                return `items/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
+            },
+        },
+
+        ui: {
+            notify(message, type = 'info', duration = 3200) {
+                const container = App.dom.get('toast-container');
+                if (!container || !message) return;
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type}`;
+                toast.textContent = message;
+                container.appendChild(toast);
+                window.setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(8px)';
+                    window.setTimeout(() => toast.remove(), 180);
+                }, duration);
+            },
+            success(message) {
+                App.ui.notify(message, 'success');
+            },
+            error(message) {
+                App.ui.notify(message, 'error', 4500);
+            },
+            info(message) {
+                App.ui.notify(message, 'info');
+            },
+            handleError(error, fallbackMessage) {
+                console.error(error);
+                const message = error?.message || fallbackMessage || App.translations[App.state.currentLang].toastGenericError;
+                App.ui.error(message);
+            },
+            setGlobalLoading(isLoading, message) {
+                const loader = App.dom.get('global-loader');
+                const text = App.dom.get('global-loader-text');
+                if (!loader || !text) return;
+                if (isLoading) {
+                    App.state.loadingCount += 1;
+                    text.textContent = message || App.translations[App.state.currentLang].loadingSave;
+                    loader.classList.add('show');
+                    return;
+                }
+                App.state.loadingCount = Math.max(0, App.state.loadingCount - 1);
+                if (App.state.loadingCount === 0) {
+                    loader.classList.remove('show');
+                    text.textContent = App.translations[App.state.currentLang].loadingSave;
+                }
+            },
+            setButtonBusy(button, isBusy, loadingText) {
+                if (!button) return;
+                if (isBusy) {
+                    if (!button.dataset.originalText) button.dataset.originalText = button.textContent;
+                    button.textContent = loadingText || button.textContent;
+                    button.disabled = true;
+                    button.classList.add('btn-busy');
+                } else {
+                    button.textContent = button.dataset.originalText || button.textContent;
+                    button.disabled = false;
+                    button.classList.remove('btn-busy');
+                }
+            },
         },
 
         data: {
+            async detectPositionColumn() {
+                if (App.state.hasPositionColumn !== null) return App.state.hasPositionColumn;
+                const { error } = await App.state.db.from('items').select('position').limit(1);
+                if (error) {
+                    if (/position/i.test(error.message)) {
+                        App.state.hasPositionColumn = false;
+                        return false;
+                    }
+                    throw error;
+                }
+                App.state.hasPositionColumn = true;
+                return true;
+            },
             async fetchMenu() {
                 const { data: categories, error: catError } = await App.state.db.from('categories').select('*');
-                const { data: items, error: itemsError } = await App.state.db.from('items').select('*');
+
+                let itemsQuery = App.state.db.from('items').select('*');
+                if (App.state.hasPositionColumn) {
+                    itemsQuery = itemsQuery
+                        .order('category_id', { ascending: true })
+                        .order('position', { ascending: true })
+                        .order('id', { ascending: true });
+                }
+                let { data: items, error: itemsError } = await itemsQuery;
+
+                if (itemsError && App.state.hasPositionColumn && /position/i.test(itemsError.message)) {
+                    App.state.hasPositionColumn = false;
+                    ({ data: items, error: itemsError } = await App.state.db.from('items').select('*'));
+                }
 
                 if (catError || itemsError) {
-                    console.error(catError || itemsError);
-                    alert('Не удалось загрузить меню из базы данных.');
+                    App.ui.handleError(catError || itemsError, App.translations[App.state.currentLang].toastMenuLoadError);
                     return false;
                 }
 
@@ -580,28 +797,138 @@ document.addEventListener('DOMContentLoaded', () => {
                     newMenuData.categories.az.push({ id: cat.id, name: cat.name_az });
                 });
                 items.forEach(item => {
-                    const priceStr = String(Number(item.price).toFixed(2)).replace('.00', '');
-                    newMenuData.items.ru.push({ id: item.id, catId: item.category_id, name: item.name_ru, desc: item.desc_ru, price: priceStr, img: item.img_url });
-                    newMenuData.items.en.push({ id: item.id, catId: item.category_id, name: item.name_en, desc: item.desc_en, price: priceStr, img: item.img_url });
-                    newMenuData.items.az.push({ id: item.id, catId: item.category_id, name: item.name_az, desc: item.desc_az, price: priceStr, img: item.img_url });
+                    const priceStr = App.utils.formatPrice(item.price);
+                    const baseItem = {
+                        id: item.id,
+                        catId: item.category_id,
+                        price: priceStr,
+                        img: item.img_url,
+                        position: Number.isFinite(Number(item.position)) ? Number(item.position) : null,
+                    };
+                    newMenuData.items.ru.push({ ...baseItem, name: item.name_ru, desc: item.desc_ru });
+                    newMenuData.items.en.push({ ...baseItem, name: item.name_en, desc: item.desc_en });
+                    newMenuData.items.az.push({ ...baseItem, name: item.name_az, desc: item.desc_az });
                 });
 
+                ['ru', 'en', 'az'].forEach(lang => {
+                    newMenuData.items[lang] = App.utils.sortItems(newMenuData.items[lang]);
+                });
                 App.state.menuData = newMenuData;
                 return true;
+            },
+            async getNextPosition(categoryId) {
+                if (!App.state.hasPositionColumn) return null;
+                const { data, error } = await App.state.db
+                    .from('items')
+                    .select('position')
+                    .eq('category_id', categoryId)
+                    .order('position', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                if (error) throw error;
+                return Number(data?.position || 0) + 1;
+            },
+            patchLocalItem(itemId, patch) {
+                ['ru', 'en', 'az'].forEach(lang => {
+                    const target = App.state.menuData.items[lang].find(item => String(item.id) === String(itemId));
+                    if (target) Object.assign(target, patch);
+                });
+            },
+            patchLocalOrder(categoryId, orderedIds) {
+                const positions = new Map(orderedIds.map((id, index) => [String(id), index + 1]));
+                ['ru', 'en', 'az'].forEach(lang => {
+                    App.state.menuData.items[lang].forEach(item => {
+                        if (String(item.catId) === String(categoryId) && positions.has(String(item.id))) {
+                            item.position = positions.get(String(item.id));
+                        }
+                    });
+                    App.state.menuData.items[lang] = App.utils.sortItems(App.state.menuData.items[lang]);
+                });
+            },
+            async normalizeCategoryPositions(categoryId) {
+                if (!App.state.hasPositionColumn) return;
+                const { data, error } = await App.state.db
+                    .from('items')
+                    .select('id')
+                    .eq('category_id', categoryId)
+                    .order('position', { ascending: true })
+                    .order('id', { ascending: true });
+                if (error) throw error;
+                const updates = (data || []).map((item, index) =>
+                    App.state.db.from('items').update({ position: index + 1 }).eq('id', item.id)
+                );
+                const results = await Promise.all(updates);
+                const failed = results.find(result => result.error);
+                if (failed?.error) throw failed.error;
+            },
+        },
+
+        storage: {
+            async uploadItemImage(file) {
+                const t = App.translations[App.state.currentLang];
+                if (!file) return '';
+                if (!App.utils.isSupportedImage(file)) {
+                    throw new Error(t.toastImageTypeError);
+                }
+                const bucket = App.state.supabaseConfig.storageBucket || App.config.storageBucket;
+                const filePath = App.utils.buildStoragePath(file);
+                const { error: uploadError } = await App.state.db.storage
+                    .from(bucket)
+                    .upload(filePath, file, {
+                        cacheControl: '3600',
+                        upsert: false,
+                        contentType: file.type || undefined,
+                    });
+                if (uploadError) throw uploadError;
+                const { data } = App.state.db.storage.from(bucket).getPublicUrl(filePath);
+                if (!data?.publicUrl) {
+                    throw new Error(t.toastImageUrlError);
+                }
+                return data.publicUrl;
             },
         },
 
         auth: {
             async signIn() {
+                const t = App.translations[App.state.currentLang];
                 const email = App.dom.get('admin-email').value;
                 const password = App.dom.get('admin-password').value;
-                const { error } = await App.state.db.auth.signInWithPassword({ email, password });
-                if (error) alert(error.message);
+                const button = App.dom.get('adm-btn-login');
+                if (App.state.pendingActions.has('auth-signin')) return;
+                App.state.pendingActions.add('auth-signin');
+                App.ui.setButtonBusy(button, true, t.loadingLogin);
+                App.ui.setGlobalLoading(true, t.loadingLogin);
+                try {
+                    const { error } = await App.state.db.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                    App.ui.success(t.toastLoginSuccess);
+                } catch (error) {
+                    App.ui.handleError(error);
+                } finally {
+                    App.state.pendingActions.delete('auth-signin');
+                    App.ui.setButtonBusy(button, false);
+                    App.ui.setGlobalLoading(false);
+                }
             },
             async signOut() {
-                const { error } = await App.state.db.auth.signOut();
-                if (error) alert(error.message);
-                else App.auth.closeAdminModal();
+                const t = App.translations[App.state.currentLang];
+                const button = App.dom.get('logout-btn');
+                if (App.state.pendingActions.has('auth-signout')) return;
+                App.state.pendingActions.add('auth-signout');
+                App.ui.setButtonBusy(button, true, t.loadingLogout);
+                App.ui.setGlobalLoading(true, t.loadingLogout);
+                try {
+                    const { error } = await App.state.db.auth.signOut();
+                    if (error) throw error;
+                    App.ui.success(t.toastLogoutSuccess);
+                    App.auth.closeAdminModal();
+                } catch (error) {
+                    App.ui.handleError(error);
+                } finally {
+                    App.state.pendingActions.delete('auth-signout');
+                    App.ui.setButtonBusy(button, false);
+                    App.ui.setGlobalLoading(false);
+                }
             },
             openAdminModal() {
                 const modal = App.dom.get('admin-modal');
@@ -683,19 +1010,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 priceWrapper.style.flexShrink = '0';
                 const priceSpan = document.createElement('span');
                 priceSpan.className = 'price-tag';
-                priceSpan.dataset.id = item.id;
 
-                const isNumeric = item.price && !isNaN(String(item.price).replace(',', '.'));
-                priceSpan.innerHTML = isNumeric
-                    ? `${u.sanitize(item.price)}<span class="unit">AZN</span>`
-                    : u.sanitize(item.price);
+                const priceValue = document.createElement('span');
+                priceValue.className = 'price-value';
+                priceValue.dataset.id = item.id;
+                priceValue.dataset.rawPrice = App.utils.formatPrice(item.price);
+                priceValue.textContent = App.utils.formatPrice(item.price);
+
+                const unitSpan = document.createElement('span');
+                unitSpan.className = 'unit';
+                unitSpan.textContent = 'AZN';
 
                 if (App.state.isPriceEditMode) {
-                    priceSpan.classList.add('price-edit-active');
-                    priceSpan.dataset.price = item.price;
-                    priceSpan.contentEditable = true;
-                    priceSpan.onblur = App.admin.updatePrice;
+                    priceValue.classList.add('price-edit-active');
+                    priceValue.contentEditable = 'true';
+                    priceValue.spellcheck = false;
+                    priceValue.addEventListener('input', App.admin.sanitizePriceInput);
+                    priceValue.addEventListener('keydown', App.admin.updatePrice);
+                    priceValue.addEventListener('blur', App.admin.updatePrice);
                 }
+                priceSpan.appendChild(priceValue);
+                priceSpan.appendChild(unitSpan);
                 priceWrapper.appendChild(priceSpan);
                 card.appendChild(priceWrapper);
                 return card;
@@ -725,6 +1060,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         `;
                         const itemsGrid = document.createElement('div');
                         itemsGrid.className = 'grid sm:grid-cols-2 gap-4';
+                        itemsGrid.dataset.categoryId = cat.id;
+                        itemsGrid.dataset.categoryGrid = 'true';
                         const categoryItems = items.filter(i => i.catId === cat.id);
                         if (categoryItems.length > 0) {
                             categoryItems.forEach(item => itemsGrid.appendChild(App.render.itemCard(item)));
@@ -750,6 +1087,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }, { threshold: 0.06 });
                     App.dom.queryAll('.menu-card').forEach(card => cardObs.observe(card));
+                    App.admin.initSortables();
                 });
             },
         },
@@ -788,7 +1126,9 @@ document.addEventListener('DOMContentLoaded', () => {
       <input type="text" id="add-item-price" placeholder="${t.placeholderPrice}" class="adm-input" style="font-size:0.75rem">
     </div>
     <input type="text" id="add-item-desc" placeholder="${t.placeholderDesc}" class="adm-input" style="font-size:0.75rem">
-    <input type="text" id="add-item-img" placeholder="${t.placeholderUrl}" class="adm-input" style="font-size:0.75rem">
+    <label style="display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(180,180,180,0.6);margin-top:4px">${t.admLabelPhoto}</label>
+    <input type="file" id="add-item-image" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="adm-input" style="font-size:0.75rem;padding:0.55rem 0.75rem">
+    <p style="font-size:0.64rem;color:rgba(180,180,180,0.45)">${t.admHintPhoto}</p>
     <button id="add-item-btn" class="btn-green">${t.admBtnPublish}</button>
   </div>
 
@@ -804,6 +1144,10 @@ document.addEventListener('DOMContentLoaded', () => {
       <button id="price-edit-btn" class="btn-blue">${t.admBtnClickEditor}</button>
     </div>
     <div class="adm-section">
+      <p style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(180,180,180,0.45);margin-bottom:5px">${t.admLabelReorder}</p>
+      <button id="reorder-btn" class="btn-blue">${t.admBtnReorder}</button>
+    </div>
+    <div class="adm-section" style="grid-column:1 / -1">
       <p style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(180,180,180,0.45);margin-bottom:5px">${t.admLabelReset}</p>
       <button id="reset-menu-btn"
         style="width:100%;background:rgba(100,100,100,0.1);border:1px solid rgba(100,100,100,0.2);color:rgba(160,160,160,0.6);padding:0.45rem;border-radius:0.55rem;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:0.08em;text-transform:uppercase;transition:all 0.18s"
@@ -833,64 +1177,285 @@ document.addEventListener('DOMContentLoaded', () => {
                 App.dom.get('add-item-btn').onclick     = App.admin.createItem;
                 App.dom.get('delete-item-btn').onclick  = App.admin.deleteItem;
                 App.dom.get('price-edit-btn').onclick   = App.admin.enablePriceEdit;
+                App.dom.get('reorder-btn').onclick      = App.admin.enableReordering;
                 App.dom.get('reset-menu-btn').onclick   = App.admin.resetMenu; // FIX: раньше id не совпадал
             },
+            syncModeBar() {
+                const t = App.translations[App.state.currentLang];
+                const bar = App.dom.get('edit-mode-bar');
+                const text = App.dom.get('edit-mode-text');
+                const button = App.dom.get('edit-mode-btn');
+                if (App.state.isPriceEditMode) {
+                    text.textContent = t.editModeText;
+                    button.textContent = t.editModeBtn;
+                    button.onclick = App.admin.disablePriceEdit;
+                    bar.classList.remove('hidden');
+                    bar.classList.add('flex');
+                    return;
+                }
+                if (App.state.isReorderingMode) {
+                    text.textContent = t.reorderModeText;
+                    button.textContent = t.reorderModeBtn;
+                    button.onclick = App.admin.disableReordering;
+                    bar.classList.remove('hidden');
+                    bar.classList.add('flex');
+                    return;
+                }
+                bar.classList.add('hidden');
+                bar.classList.remove('flex');
+            },
+            async runAction(key, options, callback) {
+                if (App.state.pendingActions.has(key)) return;
+                App.state.pendingActions.add(key);
+                const button = options?.button || null;
+                if (button) App.ui.setButtonBusy(button, true, options.loadingText);
+                if (options?.loadingMessage) App.ui.setGlobalLoading(true, options.loadingMessage);
+                try {
+                    const value = await callback();
+                    return { ok: true, value };
+                } catch (error) {
+                    App.ui.handleError(error, options?.fallbackMessage);
+                    return { ok: false, error };
+                } finally {
+                    App.state.pendingActions.delete(key);
+                    if (button) App.ui.setButtonBusy(button, false);
+                    if (options?.loadingMessage) App.ui.setGlobalLoading(false);
+                }
+            },
+            async syncAfterMutation(successMessage) {
+                await App.render.fullPage();
+                if (!App.dom.get('step-dashboard').classList.contains('hidden')) {
+                    App.admin.render();
+                }
+                if (successMessage) App.ui.success(successMessage);
+            },
+            clearItemForm() {
+                ['add-item-name', 'add-item-price', 'add-item-desc'].forEach(id => {
+                    const element = App.dom.get(id);
+                    if (element) element.value = '';
+                });
+                const fileInput = App.dom.get('add-item-image');
+                if (fileInput) fileInput.value = '';
+            },
             async createCategory() {
+                const t = App.translations[App.state.currentLang];
                 const id = App.dom.get('new-cat-id').value.trim();
                 const name = App.dom.get('new-cat-name').value.trim();
-                if (!id || !name) return alert('ID and Name are required');
-                const { error } = await App.state.db.from('categories').insert({ id, name_ru: name, name_en: name, name_az: name });
-                if (error) alert(error.message); else App.render.fullPage();
+                if (!id || !name) {
+                    App.ui.info(t.toastCategoryRequired);
+                    return;
+                }
+                await App.admin.runAction('create-category', {
+                    button: App.dom.get('create-cat-btn'),
+                    loadingText: t.loadingSave,
+                    loadingMessage: t.loadingSave,
+                }, async () => {
+                    const { error } = await App.state.db.from('categories').insert({ id, name_ru: name, name_en: name, name_az: name });
+                    if (error) throw error;
+                    App.dom.get('new-cat-id').value = '';
+                    App.dom.get('new-cat-name').value = '';
+                    await App.admin.syncAfterMutation(t.toastCategoryCreated);
+                });
             },
             async deleteCategory() {
+                const t = App.translations[App.state.currentLang];
                 const catId = App.dom.get('delete-category-select').value;
-                if (!catId || !confirm('Delete category and all its items?')) return;
-                const { error } = await App.state.db.from('categories').delete().eq('id', catId);
-                if (error) alert(error.message); else App.render.fullPage();
+                if (!catId || !confirm(t.confirmDeleteCategory)) return;
+                await App.admin.runAction('delete-category', {
+                    button: App.dom.get('delete-cat-btn'),
+                    loadingText: t.loadingDelete,
+                    loadingMessage: t.loadingDelete,
+                }, async () => {
+                    const { error: itemsError } = await App.state.db.from('items').delete().eq('category_id', catId);
+                    if (itemsError) throw itemsError;
+                    const { error } = await App.state.db.from('categories').delete().eq('id', catId);
+                    if (error) throw error;
+                    await App.admin.syncAfterMutation(t.toastCategoryDeleted);
+                });
             },
             async createItem() {
+                const t = App.translations[App.state.currentLang];
                 const catId = App.dom.get('add-item-cat-select').value;
                 const name  = App.dom.get('add-item-name').value.trim();
-                const price = parseFloat(App.dom.get('add-item-price').value.trim());
+                const price = App.utils.parsePriceInput(App.dom.get('add-item-price').value.trim());
                 const desc  = App.dom.get('add-item-desc').value.trim();
-                const img   = App.dom.get('add-item-img').value.trim();
-                if (!name || !price) return alert('Name and Price are required');
-                const { error } = await App.state.db.from('items').insert({
-                    category_id: catId,
-                    name_ru: name, name_en: name, name_az: name,
-                    price,
-                    desc_ru: desc, desc_en: desc, desc_az: desc,
-                    img_url: img
+                const imageFile = App.dom.get('add-item-image').files[0];
+                if (!catId || !name || Number.isNaN(price)) {
+                    App.ui.info(t.toastItemRequired);
+                    return;
+                }
+                await App.admin.runAction('create-item', {
+                    button: App.dom.get('add-item-btn'),
+                    loadingText: t.loadingUpload,
+                    loadingMessage: imageFile ? t.loadingUpload : t.loadingSave,
+                }, async () => {
+                    const payload = {
+                        category_id: catId,
+                        name_ru: name, name_en: name, name_az: name,
+                        price,
+                        desc_ru: desc, desc_en: desc, desc_az: desc,
+                        img_url: '',
+                    };
+                    if (imageFile) {
+                        payload.img_url = await App.storage.uploadItemImage(imageFile);
+                    }
+                    if (App.state.hasPositionColumn) {
+                        payload.position = await App.data.getNextPosition(catId);
+                    }
+                    const { error } = await App.state.db.from('items').insert(payload);
+                    if (error) throw error;
+                    App.admin.clearItemForm();
+                    await App.admin.syncAfterMutation(t.toastItemCreated);
                 });
-                if (error) alert(error.message); else App.render.fullPage();
             },
             async deleteItem() {
+                const t = App.translations[App.state.currentLang];
                 const itemId = App.dom.get('delete-item-select').value;
-                if (!itemId || !confirm('Delete item?')) return;
-                const { error } = await App.state.db.from('items').delete().eq('id', itemId);
-                if (error) alert(error.message); else App.render.fullPage();
+                if (!itemId || !confirm(t.confirmDeleteItem)) return;
+                const currentItem = (App.state.menuData.items.ru || []).find(item => String(item.id) === String(itemId));
+                await App.admin.runAction('delete-item', {
+                    button: App.dom.get('delete-item-btn'),
+                    loadingText: t.loadingDelete,
+                    loadingMessage: t.loadingDelete,
+                }, async () => {
+                    const { error } = await App.state.db.from('items').delete().eq('id', itemId);
+                    if (error) throw error;
+                    if (currentItem?.catId) await App.data.normalizeCategoryPositions(currentItem.catId);
+                    await App.admin.syncAfterMutation(t.toastItemDeleted);
+                });
             },
-            async resetMenu() { alert('Reset from SQL editor for now.'); },
-            enablePriceEdit() {
+            async resetMenu() {
+                App.ui.info(App.translations[App.state.currentLang].toastResetHint);
+            },
+            async enablePriceEdit() {
+                if (App.state.isReorderingMode) {
+                    App.state.isReorderingMode = false;
+                    App.admin.destroySortables();
+                }
                 App.state.isPriceEditMode = true;
-                App.dom.get('edit-mode-bar').classList.remove('hidden');
-                App.dom.get('edit-mode-bar').classList.add('flex');
+                App.admin.syncModeBar();
                 App.auth.closeAdminModal();
-                App.render.fullPage();
+                await App.render.fullPage();
             },
-            disablePriceEdit() {
+            async disablePriceEdit() {
                 App.state.isPriceEditMode = false;
-                App.dom.get('edit-mode-bar').classList.add('hidden');
-                App.dom.get('edit-mode-bar').classList.remove('flex');
-                App.render.fullPage();
+                App.admin.syncModeBar();
+                await App.render.fullPage();
             },
-            async updatePrice(e) {
-                const itemId = e.target.dataset.id;
-                const newPrice = parseFloat(e.target.textContent);
-                if (!itemId || isNaN(newPrice)) return;
-                const { error } = await App.state.db.from('items').update({ price: newPrice }).eq('id', itemId);
-                if (error) alert(error.message);
-                else e.target.dataset.price = newPrice;
+            async enableReordering() {
+                const t = App.translations[App.state.currentLang];
+                if (!App.state.hasPositionColumn) {
+                    App.ui.info(t.toastReorderRequiresPosition);
+                    return;
+                }
+                if (App.state.isPriceEditMode) App.state.isPriceEditMode = false;
+                App.state.isReorderingMode = true;
+                App.admin.syncModeBar();
+                App.auth.closeAdminModal();
+                await App.render.fullPage();
+                App.ui.info(t.toastReorderHint);
+            },
+            async disableReordering() {
+                App.state.isReorderingMode = false;
+                App.admin.destroySortables();
+                App.admin.syncModeBar();
+                await App.render.fullPage();
+            },
+            destroySortables() {
+                App.state.sortables.forEach(sortable => sortable.destroy());
+                App.state.sortables = [];
+            },
+            setSortablesDisabled(isDisabled) {
+                App.state.sortables.forEach(sortable => sortable.option('disabled', isDisabled));
+            },
+            initSortables() {
+                App.admin.destroySortables();
+                if (!App.state.isReorderingMode) return;
+                App.dom.queryAll('[data-category-grid="true"]').forEach(grid => {
+                    if (grid.querySelectorAll('.menu-card').length < 2) return;
+                    const sortable = Sortable.create(grid, {
+                        animation: 180,
+                        handle: '.drag-handle',
+                        ghostClass: 'sortable-ghost',
+                        chosenClass: 'sortable-chosen',
+                        onEnd: App.admin.handleSortEnd,
+                    });
+                    App.state.sortables.push(sortable);
+                });
+            },
+            sanitizePriceInput(event) {
+                const target = event.target;
+                const normalized = App.utils.normalizeEditablePrice(target.textContent);
+                if (target.textContent !== normalized) {
+                    target.textContent = normalized;
+                    App.utils.placeCaretAtEnd(target);
+                }
+            },
+            async updatePrice(event) {
+                const t = App.translations[App.state.currentLang];
+                const target = event.target;
+                const itemId = target.dataset.id;
+                if (event.type === 'keydown') {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        target.blur();
+                    }
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        target.textContent = target.dataset.rawPrice || target.textContent;
+                        target.blur();
+                    }
+                    return;
+                }
+                if (!itemId) return;
+                const newPrice = App.utils.parsePriceInput(target.textContent);
+                const previousPrice = target.dataset.rawPrice || '';
+                if (Number.isNaN(newPrice)) {
+                    target.textContent = previousPrice;
+                    App.ui.info(t.toastInvalidPrice);
+                    return;
+                }
+                const normalizedPrice = App.utils.formatPrice(newPrice);
+                target.textContent = normalizedPrice;
+                if (normalizedPrice === previousPrice) return;
+                await App.admin.runAction(`price-${itemId}`, {
+                    loadingMessage: t.loadingSave,
+                }, async () => {
+                    target.classList.add('price-saving');
+                    const { error } = await App.state.db.from('items').update({ price: newPrice }).eq('id', itemId);
+                    if (error) throw error;
+                    target.dataset.rawPrice = normalizedPrice;
+                    App.data.patchLocalItem(itemId, { price: normalizedPrice });
+                    App.ui.success(t.toastPriceSaved);
+                });
+                target.classList.remove('price-saving');
+                if (App.state.pendingActions.has(`price-${itemId}`)) return;
+                target.textContent = target.dataset.rawPrice || previousPrice;
+            },
+            async handleSortEnd(event) {
+                const categoryId = event.to.dataset.categoryId;
+                const orderedIds = [...event.to.querySelectorAll('.menu-card')].map(card => card.dataset.itemId);
+                const result = await App.admin.runAction(`reorder-${categoryId}`, {
+                    loadingMessage: App.translations[App.state.currentLang].loadingOrder,
+                }, async () => {
+                    App.admin.setSortablesDisabled(true);
+                    const updates = orderedIds.map((itemId, index) =>
+                        App.state.db
+                            .from('items')
+                            .update({ position: index + 1 })
+                            .eq('id', itemId)
+                            .eq('category_id', categoryId)
+                    );
+                    const results = await Promise.all(updates);
+                    const failed = results.find(result => result.error);
+                    if (failed?.error) throw failed.error;
+                    App.data.patchLocalOrder(categoryId, orderedIds);
+                    App.ui.success(App.translations[App.state.currentLang].toastOrderSaved);
+                });
+                App.admin.setSortablesDisabled(false);
+                if (!result?.ok) {
+                    await App.render.fullPage();
+                }
             },
         },
 
@@ -903,11 +1468,15 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         // FIX: было `.replace` вместо сравнения строк — выставляло all кнопки active
-        changeLanguage(lang) {
+        async changeLanguage(lang) {
             this.state.currentLang = lang;
             this.dom.queryAll('.lang-btn').forEach(b => b.classList.toggle('on', b.id === `btn-${lang}`));
             localStorage.setItem('chill_bar_lang', lang);
-            this.render.fullPage();
+            await this.render.fullPage();
+            this.admin.syncModeBar();
+            if (this.state.currentUser && !this.dom.get('step-dashboard').classList.contains('hidden')) {
+                this.admin.render();
+            }
         },
 
         updateTexts() {
@@ -918,6 +1487,7 @@ document.addEventListener('DOMContentLoaded', () => {
             set('adm-title', t.admTitle);
             set('edit-mode-text', t.editModeText);
             set('edit-mode-btn', t.editModeBtn);
+            App.admin.syncModeBar();
         },
 
         init: {
@@ -946,6 +1516,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const { data: { session } } = await App.state.db.auth.getSession();
                 App.state.currentUser = session?.user || null;
 
+                await App.data.detectPositionColumn();
                 App.init.events();
                 await App.render.fullPage();
             },
@@ -972,9 +1543,15 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         translations: {
-            ru: { heroSubtitle:"Premium Lounge & Меню", footer:"© 2026 CHILL BAR. Все права защищены.", admTitle:"Панель Управления", admLabelEmail:"Email", admLabelPass:"Пароль", admBtnLogin:"Войти", admBtnLogout:"Выйти", admBlock1:"Разделы меню", admBtnCreateCat:"Создать категорию", admLabelDelCat:"Удалить категорию:", admBtnDelCat:"Удалить", admBlock2:"Добавление позиции", admBtnPublish:"Опубликовать", admBlock3:"Удаление позиций", admBtnDelItem:"Удалить", admLabelFastPrice:"Клик-редактор цен", admBtnClickEditor:"Активировать", admLabelReset:"Сброс", admBtnResetMenu:"Сбросить", placeholderId:"ID (eng, no spaces)", placeholderName:"Название", placeholderPrice:"Цена", placeholderDesc:"Описание", placeholderUrl:"Ссылка на фото", emptyCat:"В этой категории пока нет позиций...", editModeText:"Режим изменения цен активен. Кликните на цену для редактирования.", editModeBtn:"Выйти" },
-            en: { heroSubtitle:"Premium Lounge & Menu", footer:"© 2026 CHILL BAR. All rights reserved.", admTitle:"Control Panel", admLabelEmail:"Email", admLabelPass:"Password", admBtnLogin:"Login", admBtnLogout:"Logout", admBlock1:"Menu Sections", admBtnCreateCat:"Create Category", admLabelDelCat:"Delete category:", admBtnDelCat:"Delete", admBlock2:"Add New Item", admBtnPublish:"Publish", admBlock3:"Delete Items", admBtnDelItem:"Delete", admLabelFastPrice:"Quick Price Editor", admBtnClickEditor:"Activate", admLabelReset:"Reset Data", admBtnResetMenu:"Reset", placeholderId:"ID (eng, no spaces)", placeholderName:"Name", placeholderPrice:"Price", placeholderDesc:"Description", placeholderUrl:"Image URL", emptyCat:"There are no items in this category yet...", editModeText:"Price editing mode is active. Click on a price to edit.", editModeBtn:"Exit" },
-            az: { heroSubtitle:"Premium Lounge & Menyu", footer:"© 2026 CHILL BAR. Bütün hüquqlar qorunur.", admTitle:"İdarəetmə Paneli", admLabelEmail:"Email", admLabelPass:"Şifrə", admBtnLogin:"Daxil Ol", admBtnLogout:"Çıxış", admBlock1:"Menyu Bölmələri", admBtnCreateCat:"Kateqoriya Yarat", admLabelDelCat:"Kateqoriyanı sil:", admBtnDelCat:"Sil", admBlock2:"Yeni Mövqe Əlavə Et", admBtnPublish:"Dərc Et", admBlock3:"Mövqelərin Silinməsi", admBtnDelItem:"Sil", admLabelFastPrice:"Klik-Redaktor", admBtnClickEditor:"Aktivləşdir", admLabelReset:"Sıfırlamaq", admBtnResetMenu:"Sıfırla", placeholderId:"ID (ing, boşluqsuz)", placeholderName:"Adı", placeholderPrice:"Qiymət", placeholderDesc:"Təsviri", placeholderUrl:"Şəkil linki", emptyCat:"Bu kateqoriyada hələ heç bir mövqe yoxdur...", editModeText:"Qiymət redaktə rejimi aktivdir. Redaktə etmək üçün qiymətə klikləyin.", editModeBtn:"Çıxış" },
+            ru: {
+                heroSubtitle:"Premium Lounge & Меню", footer:"© 2026 CHILL BAR. Все права защищены.", admTitle:"Панель Управления", admLabelEmail:"Email", admLabelPass:"Пароль", admBtnLogin:"Войти", admBtnLogout:"Выйти", admBlock1:"Разделы меню", admBtnCreateCat:"Создать категорию", admLabelDelCat:"Удалить категорию:", admBtnDelCat:"Удалить", admBlock2:"Добавление позиции", admBtnPublish:"Опубликовать", admBlock3:"Удаление позиций", admBtnDelItem:"Удалить", admLabelFastPrice:"Клик-редактор цен", admBtnClickEditor:"Активировать", admLabelReorder:"Изменение порядка", admBtnReorder:"Изменить порядок блюд", admLabelReset:"Сброс", admBtnResetMenu:"Сбросить", admLabelPhoto:"Фото блюда", admHintPhoto:"Поддерживаются JPG, PNG и WEBP. Файл загрузится в Supabase Storage автоматически.", placeholderId:"ID (eng, no spaces)", placeholderName:"Название", placeholderPrice:"Цена", placeholderDesc:"Описание", placeholderUrl:"Ссылка на фото", emptyCat:"В этой категории пока нет позиций...", editModeText:"Режим изменения цен активен. Кликните на число для редактирования.", editModeBtn:"Выйти", reorderModeText:"Режим сортировки активен. Перетаскивайте блюда внутри категории.", reorderModeBtn:"Готово", loadingSave:"Сохранение...", loadingUpload:"Загрузка фото...", loadingDelete:"Удаление...", loadingOrder:"Сохраняем порядок...", loadingLogin:"Вход...", loadingLogout:"Выход...", toastGenericError:"Не удалось выполнить действие. Попробуйте ещё раз.", toastMenuLoadError:"Не удалось загрузить меню из базы данных.", toastCategoryRequired:"Введите ID и название категории.", toastItemRequired:"Введите название и корректную цену блюда.", toastPriceSaved:"Цена успешно сохранена.", toastItemCreated:"Блюдо успешно добавлено.", toastItemDeleted:"Блюдо удалено.", toastCategoryCreated:"Категория создана.", toastCategoryDeleted:"Категория удалена.", toastOrderSaved:"Новый порядок блюд сохранён.", toastResetHint:"Сброс меню оставлен через SQL/резервное копирование, чтобы не ломать текущие данные.", toastInvalidPrice:"Введите только числовое значение цены.", toastReorderRequiresPosition:"Для сортировки нужно добавить поле position в таблицу items.", toastReorderHint:"Перетаскивайте блюда за иконку ☰.", toastImageTypeError:"Поддерживаются только JPG, PNG и WEBP.", toastImageUrlError:"Не удалось получить публичную ссылку изображения.", toastLoginSuccess:"Вход выполнен.", toastLogoutSuccess:"Вы вышли из панели администратора.", confirmDeleteCategory:"Удалить категорию и все блюда внутри неё?", confirmDeleteItem:"Удалить это блюдо?"
+            },
+            en: {
+                heroSubtitle:"Premium Lounge & Menu", footer:"© 2026 CHILL BAR. All rights reserved.", admTitle:"Control Panel", admLabelEmail:"Email", admLabelPass:"Password", admBtnLogin:"Login", admBtnLogout:"Logout", admBlock1:"Menu Sections", admBtnCreateCat:"Create Category", admLabelDelCat:"Delete category:", admBtnDelCat:"Delete", admBlock2:"Add New Item", admBtnPublish:"Publish", admBlock3:"Delete Items", admBtnDelItem:"Delete", admLabelFastPrice:"Quick Price Editor", admBtnClickEditor:"Activate", admLabelReorder:"Item Ordering", admBtnReorder:"Reorder Dishes", admLabelReset:"Reset Data", admBtnResetMenu:"Reset", admLabelPhoto:"Dish photo", admHintPhoto:"JPG, PNG and WEBP are supported. The file uploads to Supabase Storage automatically.", placeholderId:"ID (eng, no spaces)", placeholderName:"Name", placeholderPrice:"Price", placeholderDesc:"Description", placeholderUrl:"Image URL", emptyCat:"There are no items in this category yet...", editModeText:"Price editing mode is active. Click the number to edit it.", editModeBtn:"Exit", reorderModeText:"Ordering mode is active. Drag dishes inside the category.", reorderModeBtn:"Done", loadingSave:"Saving...", loadingUpload:"Uploading image...", loadingDelete:"Deleting...", loadingOrder:"Saving order...", loadingLogin:"Signing in...", loadingLogout:"Signing out...", toastGenericError:"The action could not be completed. Please try again.", toastMenuLoadError:"Failed to load the menu from the database.", toastCategoryRequired:"Enter a category ID and name.", toastItemRequired:"Enter a dish name and a valid price.", toastPriceSaved:"Price saved successfully.", toastItemCreated:"Dish added successfully.", toastItemDeleted:"Dish deleted.", toastCategoryCreated:"Category created.", toastCategoryDeleted:"Category deleted.", toastOrderSaved:"Dish order saved.", toastResetHint:"Menu reset remains available via SQL/backup to keep existing data safe.", toastInvalidPrice:"Enter numbers only for the price.", toastReorderRequiresPosition:"Add the position column to the items table to enable ordering.", toastReorderHint:"Drag dishes by the ☰ handle.", toastImageTypeError:"Only JPG, PNG and WEBP files are supported.", toastImageUrlError:"Could not get the public image URL.", toastLoginSuccess:"Signed in successfully.", toastLogoutSuccess:"You are signed out of the admin panel.", confirmDeleteCategory:"Delete the category and all dishes inside it?", confirmDeleteItem:"Delete this dish?"
+            },
+            az: {
+                heroSubtitle:"Premium Lounge & Menyu", footer:"© 2026 CHILL BAR. Bütün hüquqlar qorunur.", admTitle:"İdarəetmə Paneli", admLabelEmail:"Email", admLabelPass:"Şifrə", admBtnLogin:"Daxil Ol", admBtnLogout:"Çıxış", admBlock1:"Menyu Bölmələri", admBtnCreateCat:"Kateqoriya Yarat", admLabelDelCat:"Kateqoriyanı sil:", admBtnDelCat:"Sil", admBlock2:"Yeni Mövqe Əlavə Et", admBtnPublish:"Dərc Et", admBlock3:"Mövqelərin Silinməsi", admBtnDelItem:"Sil", admLabelFastPrice:"Klik-Redaktor", admBtnClickEditor:"Aktivləşdir", admLabelReorder:"Sıralamanın dəyişdirilməsi", admBtnReorder:"Yeməklərin sırasını dəyiş", admLabelReset:"Sıfırlamaq", admBtnResetMenu:"Sıfırla", admLabelPhoto:"Yemək şəkli", admHintPhoto:"JPG, PNG və WEBP dəstəklənir. Fayl avtomatik Supabase Storage-a yüklənəcək.", placeholderId:"ID (ing, boşluqsuz)", placeholderName:"Adı", placeholderPrice:"Qiymət", placeholderDesc:"Təsviri", placeholderUrl:"Şəkil linki", emptyCat:"Bu kateqoriyada hələ heç bir mövqe yoxdur...", editModeText:"Qiymət redaktə rejimi aktivdir. Redaktə üçün rəqəmə klikləyin.", editModeBtn:"Çıxış", reorderModeText:"Sıralama rejimi aktivdir. Yeməkləri kateqoriya daxilində sürüşdürün.", reorderModeBtn:"Hazırdır", loadingSave:"Yadda saxlanılır...", loadingUpload:"Şəkil yüklənir...", loadingDelete:"Silinir...", loadingOrder:"Sıra yadda saxlanılır...", loadingLogin:"Daxil olunur...", loadingLogout:"Çıxış edilir...", toastGenericError:"Əməliyyatı tamamlamaq olmadı. Yenidən cəhd edin.", toastMenuLoadError:"Menyunu bazadan yükləmək olmadı.", toastCategoryRequired:"Kateqoriya ID-si və adı daxil edin.", toastItemRequired:"Yeməyin adını və düzgün qiymətini daxil edin.", toastPriceSaved:"Qiymət uğurla yadda saxlanıldı.", toastItemCreated:"Yemək uğurla əlavə olundu.", toastItemDeleted:"Yemək silindi.", toastCategoryCreated:"Kateqoriya yaradıldı.", toastCategoryDeleted:"Kateqoriya silindi.", toastOrderSaved:"Yeni sıra yadda saxlanıldı.", toastResetHint:"Cari məlumatları qorumaq üçün menyunun sıfırlanması SQL/ehtiyat nüsxə ilə saxlanılıb.", toastInvalidPrice:"Qiymət üçün yalnız rəqəm daxil edin.", toastReorderRequiresPosition:"Sıralama üçün items cədvəlinə position sütunu əlavə olunmalıdır.", toastReorderHint:"Yeməkləri ☰ işarəsindən tutub sürüşdürün.", toastImageTypeError:"Yalnız JPG, PNG və WEBP faylları dəstəklənir.", toastImageUrlError:"Şəklin açıq linkini almaq olmadı.", toastLoginSuccess:"Giriş uğurludur.", toastLogoutSuccess:"Admin panelindən çıxış edildi.", confirmDeleteCategory:"Kateqoriya və onun içindəki bütün yeməklər silinsin?", confirmDeleteItem:"Bu yemək silinsin?"
+            },
         },
     };
 
@@ -996,6 +1573,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             db = window._supabaseClient;
             App.state.db = db;
+            App.state.supabaseConfig.storageBucket = config.storageBucket || config.supabaseStorageBucket || App.config.storageBucket;
             return true;
         } catch (error) {
             console.error('Supabase initialization failed:', error);
@@ -1013,7 +1591,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loaded = await initializeSupabase();
         if (loaded) {
             window.app = App;
-            App.init.once()
+            App.init.once();
         }
     })();
 
