@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru" class="scroll-smooth">
 <head>
@@ -19,12 +18,21 @@
       }
     }
   }
-</script>
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;700&family=Pacifico&display=swap" rel="stylesheet">
     <style>
+/* ─── CSS VARIABLES ─────────────────────────────────── */
+/* FIX: были не определены, из-за этого не работали var(--chill-gold) и т.д. */
+:root {
+  --chill-gold: #F3C06B;
+  --chill-dark-1: #0a0a0a;
+  --chill-dark-2: #111111;
+  --chill-crimson: #dc2626;
+}
+
 /* ─── BASE ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
@@ -53,12 +61,12 @@ body.light .menu-card {
 body.light .menu-card:hover { border-color: rgba(243,192,107,0.5); }
 body.light .ctrl-pill { background: rgba(255,255,255,0.95); border-color: rgba(243,192,107,0.3); }
 body.light .ctrl-pill svg { color: #a07820; }
-body.light .lang-wrap { background: rgba(255,255,255,0.95); }
+body.light .lang-wrap { background: rgba(255,255,255,0.95); border-color: rgba(243,192,107,0.3); }
+body.light .lang-btn { color: rgba(140,100,20,0.5); }
 body.light .adm-input { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #1a1a1a; }
 body.light .modal-box { background: rgba(250,248,243,0.99); }
 body.light .adm-section { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.07); }
-body.light .cat-line { background: rgba(243,192,107,0.25); }
-body.light .footer-text { color: rgba(100,80,20,0.4); }
+body.light .footer-text { color: rgba(100,80,20,0.35); }
 
 /* ─── SCROLLBAR HIDE ───────────────────────────────── */
 .no-scroll::-webkit-scrollbar { display: none; }
@@ -79,7 +87,6 @@ body.light .footer-text { color: rgba(100,80,20,0.4); }
     url('https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?q=80&w=1920&auto=format&fit=crop') center/cover no-repeat;
 }
 
-/* star dust layer */
 .hero-bg::before {
   content: '';
   position: absolute;
@@ -92,7 +99,8 @@ body.light .footer-text { color: rgba(100,80,20,0.4); }
 
 @keyframes drift { to { background-position: 400px 400px; } }
 
-.hero-title {
+/* FIX: добавлен .logo-font как синоним .hero-title — раньше класс не существовал */
+.hero-title, .logo-font {
   font-family: 'Pacifico', cursive;
   font-size: clamp(3.2rem, 9vw, 6rem);
   color: #F3C06B;
@@ -115,11 +123,10 @@ body.light .footer-text { color: rgba(100,80,20,0.4); }
 }
 
 @keyframes fadeUp {
-  to   { opacity: 1; transform: translateY(0); }
   from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* scroll arrow */
 .scroll-arrow {
   position: absolute;
   bottom: 1.75rem;
@@ -132,7 +139,7 @@ body.light .footer-text { color: rgba(100,80,20,0.4); }
 }
 @keyframes bounce {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50%        { transform: translateX(-50%) translateY(7px); }
+  50%       { transform: translateX(-50%) translateY(7px); }
 }
 
 .hero-fade {
@@ -142,6 +149,7 @@ body.light .footer-text { color: rgba(100,80,20,0.4); }
   background: linear-gradient(to top, #0a0a0a, transparent);
   pointer-events: none;
 }
+body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent); }
 
 /* ─── CONTROLS ─────────────────────────────────────── */
 .ctrl-pill {
@@ -186,7 +194,7 @@ body.light .footer-text { color: rgba(100,80,20,0.4); }
   transition: background 0.18s, color 0.18s;
 }
 .lang-btn.on { background: #F3C06B; color: #0a0a0a; }
-.lang-btn:not(.on):hover { color: rgba(243,192,107,0.7); }
+.lang-btn:not(.on):hover { color: rgba(243,192,107,0.75); }
 
 /* ─── NAV ──────────────────────────────────────────── */
 .nav-wrap {
@@ -241,8 +249,7 @@ body.light .footer-text { color: rgba(100,80,20,0.4); }
   justify-content: space-between;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  transition: all 0.28s cubic-bezier(0.4,0,0.2,1);
-  /* scroll reveal */
+  transition: opacity 0.45s ease, transform 0.45s ease, border-color 0.28s, box-shadow 0.28s;
   opacity: 0;
   transform: translateY(18px);
 }
@@ -250,7 +257,7 @@ body.light .footer-text { color: rgba(100,80,20,0.4); }
   opacity: 1;
   transform: translateY(0);
 }
-.menu-card:hover {
+.menu-card.show:hover {
   border-color: rgba(243,192,107,0.38);
   box-shadow: 0 0 22px rgba(243,192,107,0.09), 0 6px 28px rgba(0,0,0,0.28);
   transform: translateY(-2px) scale(1.007);
@@ -287,10 +294,8 @@ body.light .item-desc { color: rgba(100,80,20,0.45); }
 .price-tag .unit { font-size: 0.65rem; font-weight: 600; opacity: 0.75; margin-left: 2px; }
 
 /* ─── CATEGORY HEADING ─────────────────────────────── */
-.cat-heading { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
 .cat-title { font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #F3C06B; white-space: nowrap; }
 .cat-line { flex: 1; height: 1px; background: rgba(243,192,107,0.12); }
-
 
 /* ─── ADMIN MODAL ──────────────────────────────────── */
 .modal-overlay {
@@ -411,7 +416,6 @@ body.light .item-desc { color: rgba(100,80,20,0.45); }
 }
 .btn-blue:hover { background: #2563eb; color: white; border-color: #2563eb; }
 
-/* price edit mode */
 .price-edit-active {
   border: 1.5px dashed rgba(243,192,107,0.7) !important;
   border-radius: 6px;
@@ -438,74 +442,90 @@ body.light .item-desc { color: rgba(100,80,20,0.45); }
 }
 
 .sortable-ghost { opacity: 0.4; }
-.drag-handle { cursor: grab; padding-right: 12px; font-size: 1.25rem;}
+.drag-handle { cursor: grab; padding-right: 12px; font-size: 1.25rem; color: #F3C06B; }
 .drag-handle:active { cursor: grabbing; }
-
-</style>
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 </head>
 <body id="app-body" class="pb-20">
 
-    <div id="edit-mode-bar" class="fixed top-0 left-0 right-0 bg-[var(--chill-gold)] text-[var(--chill-dark-1)] text-center py-3 px-4 z-[100] hidden font-bold shadow-lg flex items-center justify-between">
-        <span id="edit-mode-text"></span>
-        <button onclick="app.admin.disablePriceEdit()" id="edit-mode-btn" class="bg-black text-white px-4 py-1.5 rounded-xl text-xs uppercase tracking-wider hover:opacity-80 transition-opacity"></button>
+    <!-- Edit Mode Bar -->
+    <div id="edit-mode-bar" class="fixed top-0 left-0 right-0 z-[100] hidden items-center justify-between px-4 py-3 font-bold shadow-lg" style="background:var(--chill-gold);color:var(--chill-dark-1)">
+        <span id="edit-mode-text" style="font-size:0.8rem;letter-spacing:0.06em"></span>
+        <button onclick="app.admin.disablePriceEdit()" id="edit-mode-btn" style="background:#0a0a0a;color:white;padding:0.35rem 1rem;border-radius:0.6rem;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:none;cursor:pointer;font-family:'Oswald',sans-serif"></button>
     </div>
 
-    
-<div style="position:fixed;top:1rem;left:1rem;z-index:60">
-  <button onclick="app.toggleTheme()" class="ctrl-pill" title="Сменить тему">
-    <svg id="icon-moon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-    </svg>
-    <svg id="icon-sun" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-    </svg>
-  </button>
-</div>
-
+    <!-- Theme Toggle (top-left) -->
+    <div style="position:fixed;top:1rem;left:1rem;z-index:60">
+        <button onclick="app.toggleTheme()" class="ctrl-pill" title="Сменить тему">
+            <svg id="icon-moon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+            </svg>
+            <svg id="icon-sun" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+        </button>
     </div>
 
-    <header class="hero-bg relative h-[50vh] flex flex-col items-center justify-center text-center px-4 overflow-hidden border-b-2 border-[var(--chill-gold)]/30">
-        <div class="relative z-10 slide-up">
-            <h1 class="logo-font text-6xl md:text-8xl text-[var(--chill-gold)] tracking-wide mb-2">Chill Bar</h1>
-            <p id="hero-subtitle" class="text-xs uppercase tracking-[0.3em] text-amber-200/70 font-semibold"></p>
+    <!-- Language Switcher (top-right) — FIX: этих кнопок вообще не было в HTML -->
+    <div style="position:fixed;top:1rem;right:1rem;z-index:60">
+        <div class="lang-wrap">
+            <button id="btn-ru" class="lang-btn on" onclick="app.changeLanguage('ru')">RU</button>
+            <button id="btn-en" class="lang-btn" onclick="app.changeLanguage('en')">EN</button>
+            <button id="btn-az" class="lang-btn" onclick="app.changeLanguage('az')">AZ</button>
         </div>
-        <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[var(--chill-dark-1)] to-transparent"></div>
+    </div>
+
+    <!-- Hero -->
+    <header class="hero-bg">
+        <div class="relative z-10 text-center px-4">
+            <h1 class="logo-font">Chill Bar</h1>
+            <p id="hero-subtitle" class="hero-sub"></p>
+        </div>
+        <div class="scroll-arrow">↓</div>
+        <div class="hero-fade"></div>
     </header>
 
-    <nav class="sticky top-0 z-50 bg-[var(--chill-dark-1)]/80 backdrop-blur-md py-4 px-4 my-8">
-        <div id="nav-container" class="flex space-x-6 max-w-4xl mx-auto justify-center overflow-x-auto"></div>
+    <!-- Navigation -->
+    <nav class="nav-wrap no-scroll">
+        <div id="nav-container" class="flex gap-2 max-w-4xl mx-auto justify-start no-scroll" style="overflow-x:auto"></div>
     </nav>
-    
-    <main id="menu-sections" class="max-w-4xl mx-auto px-4 space-y-16"></main>
 
+    <!-- Menu Sections -->
+    <main id="menu-sections" class="max-w-4xl mx-auto px-4 mt-8 space-y-16"></main>
+
+    <!-- Footer -->
     <footer class="mt-24 text-center space-y-4 pb-8">
-        <p id="footer-text" class="text-xs text-gray-500 tracking-widest uppercase"></p>
-        <button onclick="app.auth.openAdminModal()" id="admin-panel-btn" class="text-[10px] text-gray-500 hover:text-[var(--chill-gold)] transition-colors tracking-widest border border-gray-800 px-3 py-1 rounded-md">Admin Panel</button>
+        <p id="footer-text" class="text-xs tracking-widest uppercase footer-text" style="color:rgba(180,160,120,0.3)"></p>
+        <button onclick="app.auth.openAdminModal()" id="admin-panel-btn"
+            style="font-size:10px;color:rgba(180,160,120,0.3);border:1px solid rgba(180,160,120,0.1);padding:4px 12px;border-radius:6px;background:transparent;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.2s"
+            onmouseover="this.style.color='#F3C06B';this.style.borderColor='rgba(243,192,107,0.3)'"
+            onmouseout="this.style.color='rgba(180,160,120,0.3)';this.style.borderColor='rgba(180,160,120,0.1)'">Admin Panel</button>
     </footer>
 
-    
-<div id="admin-modal" class="modal-overlay hidden" onclick="if(event.target===this)app.auth.closeAdminModal()">
-<div class="modal-box no-scroll">
-
-            <div class="flex justify-between items-center pb-4 border-b border-white/10">
-                <h3 id="adm-title" class="text-sm font-bold tracking-wider uppercase text-[var(--chill-gold)]"></h3>
-                <button onclick="app.auth.closeAdminModal()" class="text-gray-400 hover:text-[var(--chill-crimson)] transition-colors text-2xl font-semibold">&times;</button>
-            </div>
-            
-            <div id="step-login" class="py-6 space-y-4">
-                <div>
-                    <label for="admin-email" id="adm-label-email" class="block text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2"></label>
-                    <input type="email" id="admin-email" placeholder="admin@chillbar.az" class="w-full bg-[var(--chill-dark-2)] border border-white/10 focus:border-[var(--chill-gold)] p-3 rounded-lg text-sm outline-none transition-colors">
-                </div>
-                <div>
-                    <label for="admin-password" id="adm-label-pass" class="block text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2"></label>
-                    <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[var(--chill-dark-2)] border border-white/10 focus:border-[var(--chill-gold)] p-3 rounded-lg text-sm outline-none transition-colors">
-                </div>
-                <button onclick="app.auth.signIn()" id="adm-btn-login" class="w-full mt-4 bg-[var(--chill-gold)] text-[var(--chill-dark-1)] font-extrabold py-3 rounded-lg text-sm uppercase tracking-wider neon-glow hover:opacity-90 transition-opacity"></button>
+    <!-- Admin Modal -->
+    <div id="admin-modal" class="modal-overlay hidden" onclick="if(event.target===this)app.auth.closeAdminModal()">
+        <div class="modal-box no-scroll">
+            <div class="flex justify-between items-center pb-4" style="border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:1rem">
+                <h3 id="adm-title" style="font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#F3C06B"></h3>
+                <button onclick="app.auth.closeAdminModal()"
+                    style="background:none;border:none;cursor:pointer;color:rgba(150,150,150,0.7);font-size:1.5rem;line-height:1;transition:color 0.18s;padding:0 4px"
+                    onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='rgba(150,150,150,0.7)'">&times;</button>
             </div>
 
-            <div id="step-dashboard" class="hidden overflow-y-auto py-4 space-y-6"></div>
+            <div id="step-login" class="py-2 space-y-4">
+                <div>
+                    <label for="admin-email" id="adm-label-email" style="display:block;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(150,150,150,0.7);font-weight:600;margin-bottom:8px"></label>
+                    <input type="email" id="admin-email" placeholder="admin@chillbar.az" class="adm-input">
+                </div>
+                <div>
+                    <label for="admin-password" id="adm-label-pass" style="display:block;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(150,150,150,0.7);font-weight:600;margin-bottom:8px"></label>
+                    <input type="password" id="admin-password" placeholder="••••••••" class="adm-input">
+                </div>
+                <button onclick="app.auth.signIn()" id="adm-btn-login" class="btn-gold" style="margin-top:0.5rem"></button>
+            </div>
+
+            <div id="step-dashboard" class="hidden overflow-y-auto py-2 space-y-4"></div>
         </div>
     </div>
 
@@ -517,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const App = {
         config: {
             defaultLang: 'ru',
-            scrollOffset: -150,
+            scrollOffset: -80,
         },
         state: {
             currentLang: 'ru',
@@ -525,6 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser: null,
             db: null,
             isPriceEditMode: false,
+            isReorderingMode: false,
         },
 
         dom: {
@@ -532,11 +553,11 @@ document.addEventListener('DOMContentLoaded', () => {
             query: (selector) => document.querySelector(selector),
             queryAll: (selector) => document.querySelectorAll(selector),
         },
-        
+
         utils: {
             sanitize(str) {
                 if (typeof str !== 'string') return '';
-                const map = {'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'};
+                const map = {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'};
                 return str.replace(/[<>&"']/g, c => map[c]);
             },
         },
@@ -548,11 +569,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (catError || itemsError) {
                     console.error(catError || itemsError);
-                    alert("Не удалось загрузить меню из базы данных.");
+                    alert('Не удалось загрузить меню из базы данных.');
                     return false;
                 }
-                
-                const newMenuData = { categories: { ru: [], en: [], az: [] }, items: { ru: [], en: [], az: [] } };
+
+                const newMenuData = { categories: {ru:[],en:[],az:[]}, items: {ru:[],en:[],az:[]} };
                 categories.forEach(cat => {
                     newMenuData.categories.ru.push({ id: cat.id, name: cat.name_ru });
                     newMenuData.categories.en.push({ id: cat.id, name: cat.name_en });
@@ -564,7 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     newMenuData.items.en.push({ id: item.id, catId: item.category_id, name: item.name_en, desc: item.desc_en, price: priceStr, img: item.img_url });
                     newMenuData.items.az.push({ id: item.id, catId: item.category_id, name: item.name_az, desc: item.desc_az, price: priceStr, img: item.img_url });
                 });
-                
+
                 App.state.menuData = newMenuData;
                 return true;
             },
@@ -583,9 +604,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 else App.auth.closeAdminModal();
             },
             openAdminModal() {
-                App.dom.get('admin-modal').classList.remove('hidden');
-                App.dom.get('admin-modal').classList.add('flex');
+                const modal = App.dom.get('admin-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
                 const t = App.translations[App.state.currentLang];
+                App.dom.get('adm-title').textContent = t.admTitle;
                 App.dom.get('adm-label-email').textContent = t.admLabelEmail;
                 App.dom.get('adm-label-pass').textContent = t.admLabelPass;
                 App.dom.get('adm-btn-login').textContent = t.admBtnLogin;
@@ -599,16 +622,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     App.dom.get('step-dashboard').classList.add('hidden');
                 }
             },
-            closeAdminModal() { App.dom.get('admin-modal').classList.add('hidden'); },
+            closeAdminModal() {
+                const modal = App.dom.get('admin-modal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            },
         },
-        
+
         render: {
             skeletons() {
-                let skeletons = '';
+                let s = '';
                 for (let i = 0; i < 3; i++) {
-                    skeletons += `<section class="space-y-6 opacity-30"><div class="h-8 w-1/3 skeleton"></div><div class="grid sm:grid-cols-2 gap-4"><div class="h-24 skeleton"></div><div class="h-24 skeleton"></div></div></section>`;
+                    s += `<section class="space-y-4 opacity-30">
+                        <div style="height:2rem;width:33%;background:#1e1e1e;border-radius:0.5rem;animation:shimmer 1.4s ease-in-out infinite;background-size:200% 100%;background-image:linear-gradient(90deg,#141414 25%,#1e1e1e 50%,#141414 75%)"></div>
+                        <div class="grid sm:grid-cols-2 gap-4">
+                            <div class="skeleton"></div><div class="skeleton"></div>
+                            <div class="skeleton"></div><div class="skeleton"></div>
+                        </div>
+                    </section>`;
                 }
-                return skeletons;
+                return s;
             },
             nav() {
                 const container = App.dom.get('nav-container');
@@ -630,9 +663,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const card = document.createElement('div');
                 card.className = 'menu-card';
                 card.dataset.itemId = item.id;
-                
-                const dragHandle = App.state.isReorderingMode ? `<div class="drag-handle text-[var(--gold)]">☰</div>` : '';
-                const imageHtml = item.img ? `<img src="${u.sanitize(item.img)}" loading="lazy" style="width:48px;height:48px;object-fit:cover;border-radius:10px;flex-shrink:0" alt="">` : '';
+
+                const dragHandle = App.state.isReorderingMode ? `<div class="drag-handle">☰</div>` : '';
+                const imageHtml = item.img
+                    ? `<img src="${u.sanitize(item.img)}" loading="lazy" style="width:48px;height:48px;object-fit:cover;border-radius:10px;flex-shrink:0" alt="">`
+                    : '';
 
                 card.innerHTML = `
                     <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;padding-right:12px">
@@ -647,17 +682,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const priceWrapper = document.createElement('div');
                 priceWrapper.style.flexShrink = '0';
                 const priceSpan = document.createElement('span');
-                priceSpan.className = "price-tag";
+                priceSpan.className = 'price-tag';
                 priceSpan.dataset.id = item.id;
-                
-                const isNumeric = (item.price && !isNaN(String(item.price).replace(',', '.')));
-                if (isNumeric) {
-                    priceSpan.innerHTML = `${u.sanitize(item.price)}<span class="unit">AZN</span>`;
-                } else {
-                    priceSpan.innerHTML = `${u.sanitize(item.price)}`;
-                }
 
-                if(App.state.isPriceEditMode) {
+                const isNumeric = item.price && !isNaN(String(item.price).replace(',', '.'));
+                priceSpan.innerHTML = isNumeric
+                    ? `${u.sanitize(item.price)}<span class="unit">AZN</span>`
+                    : u.sanitize(item.price);
+
+                if (App.state.isPriceEditMode) {
                     priceSpan.classList.add('price-edit-active');
                     priceSpan.dataset.price = item.price;
                     priceSpan.contentEditable = true;
@@ -679,95 +712,132 @@ document.addEventListener('DOMContentLoaded', () => {
                     const fragment = document.createDocumentFragment();
                     const categories = App.state.menuData.categories[App.state.currentLang] || [];
                     const items = App.state.menuData.items[App.state.currentLang] || [];
+
                     categories.forEach(cat => {
                         const section = document.createElement('section');
-                        section.id = cat.id; section.className = 'scroll-mt-24 space-y-6 fade-in';
-                        section.innerHTML = `<div class="flex items-center space-x-4"><h2 class="text-2xl font-bold uppercase tracking-wider text-[var(--chill-gold)]">${App.utils.sanitize(cat.name)}</h2><div class="h-[1px] bg-[var(--chill-gold)]/20 flex-grow"></div></div>`;
+                        section.id = cat.id;
+                        section.className = 'scroll-mt-24 space-y-4';
+                        section.innerHTML = `
+                            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem">
+                                <h2 class="cat-title">${App.utils.sanitize(cat.name)}</h2>
+                                <div class="cat-line"></div>
+                            </div>
+                        `;
                         const itemsGrid = document.createElement('div');
                         itemsGrid.className = 'grid sm:grid-cols-2 gap-4';
-                        const categoryItems = items.filter(item => item.catId === cat.id);
-                        if (categoryItems.length > 0) categoryItems.forEach(item => itemsGrid.appendChild(App.render.itemCard(item)));
-                        else itemsGrid.innerHTML = `<p class="text-xs text-gray-400 italic">${App.translations[App.state.currentLang].emptyCat}</p>`;
+                        const categoryItems = items.filter(i => i.catId === cat.id);
+                        if (categoryItems.length > 0) {
+                            categoryItems.forEach(item => itemsGrid.appendChild(App.render.itemCard(item)));
+                        } else {
+                            itemsGrid.innerHTML = `<p style="font-size:0.75rem;color:rgba(150,150,150,0.5);font-style:italic;padding:0.5rem 0">${App.translations[App.state.currentLang].emptyCat}</p>`;
+                        }
                         section.appendChild(itemsGrid);
                         fragment.appendChild(section);
                     });
+
                     sectionsContainer.innerHTML = '';
                     sectionsContainer.appendChild(fragment);
                     App.init.animations();
                     App.updateTexts();
+
+                    // FIX: карточки не появлялись — не было IntersectionObserver для .show
+                    const cardObs = new IntersectionObserver((entries) => {
+                        entries.forEach((e, i) => {
+                            if (e.isIntersecting) {
+                                setTimeout(() => e.target.classList.add('show'), i * 40);
+                                cardObs.unobserve(e.target);
+                            }
+                        });
+                    }, { threshold: 0.06 });
+                    App.dom.queryAll('.menu-card').forEach(card => cardObs.observe(card));
                 });
             },
         },
-    
+
         admin: {
             render() {
-                 const t = App.translations[App.state.currentLang];
-                App.dom.get('step-dashboard').innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:1rem;margin-bottom:1rem;border-bottom:1px solid rgba(243,192,107,0.12)">
+                const t = App.translations[App.state.currentLang];
+                App.dom.get('step-dashboard').innerHTML = `
+  <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:1rem;margin-bottom:0.5rem;border-bottom:1px solid rgba(243,192,107,0.12)">
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="width:8px;height:8px;border-radius:50%;background:#F3C06B;animation:pulseBorder 2s infinite;display:inline-block"></span>
-      <span id="adm-title" style="font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#F3C06B">${t.admTitle} - ${App.state.currentUser?.email || 'Admin'}</span>
+      <span style="width:8px;height:8px;border-radius:50%;background:#F3C06B;animation:pulseBorder 2s infinite;display:inline-block;flex-shrink:0"></span>
+      <span style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#F3C06B">${t.admTitle} — ${App.state.currentUser?.email || 'Admin'}</span>
     </div>
     <button id="logout-btn" class="btn-red">${t.admBtnLogout}</button>
-  </div><div class="adm-section space-y-2">
-      <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#F3C06B;margin-bottom:6px">${t.admBlock1}</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <input type="text" id="new-cat-id" class="adm-input" placeholder="${t.placeholderId}" style="font-size:0.75rem">
-        <input type="text" id="new-cat-name" class="adm-input" placeholder="${t.placeholderName}" style="font-size:0.75rem">
-      </div>
-      <button id="create-cat-btn" class="btn-gold" style="font-size:0.72rem;padding:0.55rem">${t.admBtnCreateCat}</button>
-      <label style="display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#ef4444;margin-top:6px">${t.admLabelDelCat}</label>
-      <div style="display:flex;gap:8px">
-        <select id="delete-category-select" class="adm-input flex-1" style="font-size:0.75rem"></select>
-        <button id="delete-cat-btn" class="btn-red">${t.admBtnDelCat}</button>
-      </div>
-    </div>
-    
-    <div class="adm-section space-y-2">
-      <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#F3C06B;margin-bottom:6px">${t.admBlock2}</p>
-      <select id="add-item-cat-select" class="adm-input" style="font-size:0.75rem"></select>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <input type="text" id="add-item-name" placeholder="${t.placeholderName}" class="adm-input" style="font-size:0.75rem">
-        <input type="text" id="add-item-price" placeholder="${t.placeholderPrice}" class="adm-input" style="font-size:0.75rem">
-      </div>
-      <input type="text" id="add-item-desc" placeholder="${t.placeholderDesc}" class="adm-input" style="font-size:0.75rem">
-      <input type="text" id="add-item-img" placeholder="${t.placeholderUrl}" class="adm-input" style="font-size:0.75rem">
-      <button id="add-item-btn" class="btn-green">${t.admBtnPublish}</button>
-    </div>
+  </div>
 
-    <div class="adm-section space-y-2">
-      <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#F3C06B;margin-bottom:6px">${t.admBlock3}</p>
-      <select id="delete-item-select" class="adm-input" style="font-size:0.75rem"></select>
-      <button id="delete-item-btn" class="btn-red" style="width:100%;padding:0.55rem">${t.admBtnDelItem}</button>
-    </div>
-
+  <div class="adm-section space-y-2">
+    <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#F3C06B;margin-bottom:6px">${t.admBlock1}</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div class="adm-section">
-        <p style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(180,180,180,0.45);margin-bottom:5px">${t.admLabelFastPrice}</p>
-        <button id="price-edit-btn" class="btn-blue">${t.admBtnClickEditor}</button>
-      </div>
-      <div class="adm-section">
-        <p style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(180,180,180,0.45);margin-bottom:5px">Sorting Menu</p>
-        <button id="reorder-btn" style="width:100%;background:rgba(100,100,100,0.1);border:1px solid rgba(100,100,100,0.2);color:rgba(160,160,160,0.6);padding:0.45rem;border-radius:0.55rem;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:0.08em;text-transform:uppercase;transition:all 0.18s"
-          onmouseover="this.style.background='rgba(220,38,38,0.18)';this.style.color='#ef4444'"
-          onmouseout="this.style.background='rgba(100,100,100,0.1)';this.style.color='rgba(160,160,160,0.6)'">REORDER_MODE</button>
-      </div>
+      <input type="text" id="new-cat-id" class="adm-input" placeholder="${t.placeholderId}" style="font-size:0.75rem">
+      <input type="text" id="new-cat-name" class="adm-input" placeholder="${t.placeholderName}" style="font-size:0.75rem">
     </div>
-`;
+    <button id="create-cat-btn" class="btn-gold" style="font-size:0.72rem;padding:0.55rem">${t.admBtnCreateCat}</button>
+    <label style="display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#ef4444;margin-top:6px">${t.admLabelDelCat}</label>
+    <div style="display:flex;gap:8px">
+      <select id="delete-category-select" class="adm-input flex-1" style="font-size:0.75rem"></select>
+      <button id="delete-cat-btn" class="btn-red">${t.admBtnDelCat}</button>
+    </div>
+  </div>
 
+  <div class="adm-section space-y-2">
+    <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#F3C06B;margin-bottom:6px">${t.admBlock2}</p>
+    <select id="add-item-cat-select" class="adm-input" style="font-size:0.75rem"></select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <input type="text" id="add-item-name" placeholder="${t.placeholderName}" class="adm-input" style="font-size:0.75rem">
+      <input type="text" id="add-item-price" placeholder="${t.placeholderPrice}" class="adm-input" style="font-size:0.75rem">
+    </div>
+    <input type="text" id="add-item-desc" placeholder="${t.placeholderDesc}" class="adm-input" style="font-size:0.75rem">
+    <input type="text" id="add-item-img" placeholder="${t.placeholderUrl}" class="adm-input" style="font-size:0.75rem">
+    <button id="add-item-btn" class="btn-green">${t.admBtnPublish}</button>
+  </div>
+
+  <div class="adm-section space-y-2">
+    <p style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#F3C06B;margin-bottom:6px">${t.admBlock3}</p>
+    <select id="delete-item-select" class="adm-input" style="font-size:0.75rem"></select>
+    <button id="delete-item-btn" class="btn-red" style="width:100%;padding:0.55rem;margin-top:4px">${t.admBtnDelItem}</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div class="adm-section">
+      <p style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(180,180,180,0.45);margin-bottom:5px">${t.admLabelFastPrice}</p>
+      <button id="price-edit-btn" class="btn-blue">${t.admBtnClickEditor}</button>
+    </div>
+    <div class="adm-section">
+      <p style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(180,180,180,0.45);margin-bottom:5px">${t.admLabelReset}</p>
+      <button id="reset-menu-btn"
+        style="width:100%;background:rgba(100,100,100,0.1);border:1px solid rgba(100,100,100,0.2);color:rgba(160,160,160,0.6);padding:0.45rem;border-radius:0.55rem;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:0.08em;text-transform:uppercase;transition:all 0.18s"
+        onmouseover="this.style.background='rgba(220,38,38,0.18)';this.style.color='#ef4444'"
+        onmouseout="this.style.background='rgba(100,100,100,0.1)';this.style.color='rgba(160,160,160,0.6)'">${t.admBtnResetMenu}</button>
+    </div>
+  </div>
+`;
+                // Populate selects
                 const cats = App.state.menuData.categories[App.state.currentLang] || [];
                 const items = App.state.menuData.items[App.state.currentLang] || [];
                 const catOpts = cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
                 let itemOpts = '';
-                cats.forEach(cat => { itemOpts += items.filter(i => i.catId === cat.id).map(i => `<option value="${i.id}">[${cat.name}] ${i.name}</option>`).join(''); });
+                cats.forEach(cat => {
+                    itemOpts += items.filter(i => i.catId === cat.id)
+                        .map(i => `<option value="${i.id}">[${cat.name}] ${i.name}</option>`).join('');
+                });
 
-                App.dom.get('delete-category-select').innerHTML = catOpts; App.dom.get('add-item-cat-select').innerHTML = catOpts; App.dom.get('delete-item-select').innerHTML = itemOpts;
-                
-                App.dom.get('logout-btn').onclick = App.auth.signOut; App.dom.get('create-cat-btn').onclick = App.admin.createCategory; App.dom.get('delete-cat-btn').onclick = App.admin.deleteCategory;
-                App.dom.get('add-item-btn').onclick = App.admin.createItem; App.dom.get('delete-item-btn').onclick = App.admin.deleteItem;
-                App.dom.get('price-edit-btn').onclick = App.admin.enablePriceEdit; App.dom.get('reset-menu-btn').onclick = App.admin.resetMenu;
+                App.dom.get('delete-category-select').innerHTML = catOpts;
+                App.dom.get('add-item-cat-select').innerHTML = catOpts;
+                App.dom.get('delete-item-select').innerHTML = itemOpts;
+
+                // Wire up buttons
+                App.dom.get('logout-btn').onclick       = App.auth.signOut;
+                App.dom.get('create-cat-btn').onclick   = App.admin.createCategory;
+                App.dom.get('delete-cat-btn').onclick   = App.admin.deleteCategory;
+                App.dom.get('add-item-btn').onclick     = App.admin.createItem;
+                App.dom.get('delete-item-btn').onclick  = App.admin.deleteItem;
+                App.dom.get('price-edit-btn').onclick   = App.admin.enablePriceEdit;
+                App.dom.get('reset-menu-btn').onclick   = App.admin.resetMenu; // FIX: раньше id не совпадал
             },
             async createCategory() {
-                const id = App.dom.get('new-cat-id').value.trim(); const name = App.dom.get('new-cat-name').value.trim();
+                const id = App.dom.get('new-cat-id').value.trim();
+                const name = App.dom.get('new-cat-name').value.trim();
                 if (!id || !name) return alert('ID and Name are required');
                 const { error } = await App.state.db.from('categories').insert({ id, name_ru: name, name_en: name, name_az: name });
                 if (error) alert(error.message); else App.render.fullPage();
@@ -779,11 +849,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (error) alert(error.message); else App.render.fullPage();
             },
             async createItem() {
-                const catId = App.dom.get('add-item-cat-select').value; const name = App.dom.get('add-item-name').value.trim();
-                const price = parseFloat(App.dom.get('add-item-price').value.trim()); const desc = App.dom.get('add-item-desc').value.trim();
-                const img = App.dom.get('add-item-img').value.trim();
+                const catId = App.dom.get('add-item-cat-select').value;
+                const name  = App.dom.get('add-item-name').value.trim();
+                const price = parseFloat(App.dom.get('add-item-price').value.trim());
+                const desc  = App.dom.get('add-item-desc').value.trim();
+                const img   = App.dom.get('add-item-img').value.trim();
                 if (!name || !price) return alert('Name and Price are required');
-                const { error } = await App.state.db.from('items').insert({ category_id: catId, name_ru: name, name_en: name, name_az: name, price, desc_ru: desc, desc_en: desc, desc_az: desc, img_url: img });
+                const { error } = await App.state.db.from('items').insert({
+                    category_id: catId,
+                    name_ru: name, name_en: name, name_az: name,
+                    price,
+                    desc_ru: desc, desc_en: desc, desc_az: desc,
+                    img_url: img
+                });
                 if (error) alert(error.message); else App.render.fullPage();
             },
             async deleteItem() {
@@ -792,41 +870,79 @@ document.addEventListener('DOMContentLoaded', () => {
                 const { error } = await App.state.db.from('items').delete().eq('id', itemId);
                 if (error) alert(error.message); else App.render.fullPage();
             },
-            async resetMenu() { /* This is now more complex, involves clearing and re-inserting. Let's just disable for now. */ alert('Reset from SQL editor for now.'); },
-            enablePriceEdit() { App.state.isPriceEditMode = true; App.dom.get('edit-mode-bar').classList.remove('hidden'); App.auth.closeAdminModal(); App.render.fullPage(); },
-            disablePriceEdit() {  App.state.isPriceEditMode = false; App.dom.get('edit-mode-bar').classList.add('hidden'); App.render.fullPage(); },
+            async resetMenu() { alert('Reset from SQL editor for now.'); },
+            enablePriceEdit() {
+                App.state.isPriceEditMode = true;
+                App.dom.get('edit-mode-bar').classList.remove('hidden');
+                App.dom.get('edit-mode-bar').classList.add('flex');
+                App.auth.closeAdminModal();
+                App.render.fullPage();
+            },
+            disablePriceEdit() {
+                App.state.isPriceEditMode = false;
+                App.dom.get('edit-mode-bar').classList.add('hidden');
+                App.dom.get('edit-mode-bar').classList.remove('flex');
+                App.render.fullPage();
+            },
             async updatePrice(e) {
-                const itemId = e.target.dataset.id; const newPrice = parseFloat(e.target.textContent);
+                const itemId = e.target.dataset.id;
+                const newPrice = parseFloat(e.target.textContent);
                 if (!itemId || isNaN(newPrice)) return;
                 const { error } = await App.state.db.from('items').update({ price: newPrice }).eq('id', itemId);
                 if (error) alert(error.message);
                 else e.target.dataset.price = newPrice;
             },
         },
-    
+
+        // FIX: функция полностью отсутствовала — toggleTheme is not a function
+        toggleTheme() {
+            const isLight = document.body.classList.toggle('light');
+            App.dom.get('icon-moon').classList.toggle('hidden', isLight);
+            App.dom.get('icon-sun').classList.toggle('hidden', !isLight);
+            localStorage.setItem('chill_bar_theme', isLight ? 'light' : 'dark');
+        },
+
+        // FIX: было `.replace` вместо сравнения строк — выставляло all кнопки active
         changeLanguage(lang) {
             this.state.currentLang = lang;
-            this.dom.queryAll('.lang-btn').forEach(b => b.classList.toggle('bg-[var(--chill-gold)]', b.id===`btn-${lang}`.replace));
+            this.dom.queryAll('.lang-btn').forEach(b => b.classList.toggle('on', b.id === `btn-${lang}`));
             localStorage.setItem('chill_bar_lang', lang);
             this.render.fullPage();
         },
 
         updateTexts() {
             const t = App.translations[this.state.currentLang];
-            this.dom.get('hero-subtitle').textContent = t.heroSubtitle;
-            this.dom.get('footer-text').textContent = t.footer;
-            this.dom.get('adm-title').textContent = t.admTitle;
-            this.dom.get('edit-mode-text').textContent = t.editModeText;
-            this.dom.get('edit-mode-btn').textContent = t.editModeBtn;
+            const set = (id, txt) => { const el = App.dom.get(id); if (el) el.textContent = txt; };
+            set('hero-subtitle', t.heroSubtitle);
+            set('footer-text', t.footer);
+            set('adm-title', t.admTitle);
+            set('edit-mode-text', t.editModeText);
+            set('edit-mode-btn', t.editModeBtn);
         },
 
         init: {
             async once() {
+                // Restore saved language
                 const savedLang = localStorage.getItem('chill_bar_lang');
                 if (savedLang && App.translations[savedLang]) App.state.currentLang = savedLang;
-                
-                App.state.db.auth.onAuthStateChange((_event, session) => { App.state.currentUser = session?.user || null; 
- App.auth.openAdminModal(); });
+                App.dom.queryAll('.lang-btn').forEach(b => b.classList.toggle('on', b.id === `btn-${App.state.currentLang}`));
+
+                // Restore saved theme
+                const savedTheme = localStorage.getItem('chill_bar_theme');
+                if (savedTheme === 'light') {
+                    document.body.classList.add('light');
+                    App.dom.get('icon-moon').classList.add('hidden');
+                    App.dom.get('icon-sun').classList.remove('hidden');
+                }
+
+                // FIX: openAdminModal вызывался при каждом изменении auth state,
+                // в т.ч. при загрузке страницы — теперь только при SIGNED_IN
+                App.state.db.auth.onAuthStateChange((_event, session) => {
+                    App.state.currentUser = session?.user || null;
+                    if (_event === 'SIGNED_IN') App.auth.openAdminModal();
+                    if (_event === 'SIGNED_OUT') App.auth.closeAdminModal();
+                });
+
                 const { data: { session } } = await App.state.db.auth.getSession();
                 App.state.currentUser = session?.user || null;
 
@@ -834,26 +950,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 await App.render.fullPage();
             },
             animations() {
-                App.dom.queryAll('a[href^="#"]').forEach(a => a.addEventListener('click', function (e) {
+                App.dom.queryAll('a[href^="#"]').forEach(a => a.addEventListener('click', function(e) {
                     e.preventDefault();
                     const target = App.dom.query(this.getAttribute('href'));
-                    if(target) window.scrollTo({ top: target.getBoundingClientRect().top + window.pageYOffset + App.config.scrollOffset, behavior: "smooth"});
+                    if (target) window.scrollTo({
+                        top: target.getBoundingClientRect().top + window.pageYOffset + App.config.scrollOffset,
+                        behavior: 'smooth'
+                    });
                 }));
-                const obs = new IntersectionObserver((es) => es.forEach(e => { if(e.isIntersecting) App.dom.queryAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.navId === e.target.id))}), { rootMargin: "0px 0px -70% 0px" });
+                // FIX: было .nav-link — такого класса не существует, нужно .nav-pill
+                const obs = new IntersectionObserver((es) => es.forEach(e => {
+                    if (e.isIntersecting) {
+                        App.dom.queryAll('.nav-pill').forEach(l => l.classList.toggle('active', l.dataset.navId === e.target.id));
+                    }
+                }), { rootMargin: '0px 0px -70% 0px' });
                 App.dom.queryAll('#menu-sections > section').forEach(s => obs.observe(s));
             },
             events() {
                 App.dom.get('admin-password').addEventListener('keydown', e => e.key === 'Enter' && App.auth.signIn());
-            }
+            },
         },
 
-        translations: {ru:{heroSubtitle:"Premium Lounge & Меню",footer:"© 2026 CHILL BAR. Все права защищены.",admTitle:"Панель Управления",admLabelEmail:"Email",admLabelPass:"Пароль",admBtnLogin:"Войти",admBtnLogout:"Выйти",admBlock1:"Разделы меню",admBtnCreateCat:"Создать категорию",admLabelDelCat:"Удалить категорию:",admBtnDelCat:"Удалить",admBlock2:"Добавление позиции",admBtnPublish:"Опубликовать",admBlock3:"Удаление позиций",admBtnDelItem:"Удалить",admLabelFastPrice:"Клик-редактор цен",admBtnClickEditor:"Активировать",admLabelReset:"Сброс",admBtnResetMenu:"Сбросить",placeholderId:"ID (eng, no spaces)",placeholderName:"Название",placeholderPrice:"Цена",placeholderDesc:"Описание",placeholderUrl:"Ссылка на фото",emptyCat:"В этой категории пока нет позиций...",editModeText:"Режим изменения цен активен. Кликните на цену для редактирования.",editModeBtn:"Выйти"},en:{heroSubtitle:"Premium Lounge & Menu",footer:"© 2026 CHILL BAR. All rights reserved.",admTitle:"Control Panel",admLabelEmail:"Email",admLabelPass:"Password",admBtnLogin:"Login",admBtnLogout:"Logout",admBlock1:"Menu Sections",admBtnCreateCat:"Create Category",admLabelDelCat:"Delete category:",admBtnDelCat:"Delete",admBlock2:"Add New Item",admBtnPublish:"Publish",admBlock3:"Delete Items",admBtnDelItem:"Delete",admLabelFastPrice:"Quick Price Editor",admBtnClickEditor:"Activate",admLabelReset:"Reset Data",admBtnResetMenu:"Reset",placeholderId:"ID (eng, no spaces)",placeholderName:"Name",placeholderPrice:"Price",placeholderDesc:"Description",placeholderUrl:"Image URL",emptyCat:"There are no items in this category yet...",editModeText:"Price editing mode is active. Click on a price to edit.",editModeBtn:"Exit"},az:{heroSubtitle:"Premium Lounge & Menyu",footer:"© 2026 CHILL BAR. Bütün hüquqlar qorunur.",admTitle:"İdarəetmə Paneli",admLabelEmail:"Email",admLabelPass:"Şifrə",admBtnLogin:"Daxil Ol",admBtnLogout:"Çıxış",admBlock1:"Menyu Bölmələri",admBtnCreateCat:"Kateqoriya Yarat",admLabelDelCat:"Kateqoriyanı sil:",admBtnDelCat:"Sil",admBlock2:"Yeni Mövqe Əlavə Et",admBtnPublish:"Dərc Et",admBlock3:"Mövqelərin Silinməsi",admBtnDelItem:"Sil",admLabelFastPrice:"Klik-Redaktor",admBtnClickEditor:"Aktivləşdir",admLabelReset:"Sıfırlamaq",admBtnResetMenu:"Sıfırla",placeholderId:"ID (ing, boşluqsuz)",placeholderName:"Adı",placeholderPrice:"Qiymət",placeholderDesc:"Təsviri",placeholderUrl:"Şəkil linki",emptyCat:"Bu kateqoriyada hələ heç bir mövqe yoxdur...",editModeText:"Qiymət redaktə rejimi aktivdir. Redaktə etmək üçün qiymətə klikləyin.",editModeBtn:"Çıxış"}}
+        translations: {
+            ru: { heroSubtitle:"Premium Lounge & Меню", footer:"© 2026 CHILL BAR. Все права защищены.", admTitle:"Панель Управления", admLabelEmail:"Email", admLabelPass:"Пароль", admBtnLogin:"Войти", admBtnLogout:"Выйти", admBlock1:"Разделы меню", admBtnCreateCat:"Создать категорию", admLabelDelCat:"Удалить категорию:", admBtnDelCat:"Удалить", admBlock2:"Добавление позиции", admBtnPublish:"Опубликовать", admBlock3:"Удаление позиций", admBtnDelItem:"Удалить", admLabelFastPrice:"Клик-редактор цен", admBtnClickEditor:"Активировать", admLabelReset:"Сброс", admBtnResetMenu:"Сбросить", placeholderId:"ID (eng, no spaces)", placeholderName:"Название", placeholderPrice:"Цена", placeholderDesc:"Описание", placeholderUrl:"Ссылка на фото", emptyCat:"В этой категории пока нет позиций...", editModeText:"Режим изменения цен активен. Кликните на цену для редактирования.", editModeBtn:"Выйти" },
+            en: { heroSubtitle:"Premium Lounge & Menu", footer:"© 2026 CHILL BAR. All rights reserved.", admTitle:"Control Panel", admLabelEmail:"Email", admLabelPass:"Password", admBtnLogin:"Login", admBtnLogout:"Logout", admBlock1:"Menu Sections", admBtnCreateCat:"Create Category", admLabelDelCat:"Delete category:", admBtnDelCat:"Delete", admBlock2:"Add New Item", admBtnPublish:"Publish", admBlock3:"Delete Items", admBtnDelItem:"Delete", admLabelFastPrice:"Quick Price Editor", admBtnClickEditor:"Activate", admLabelReset:"Reset Data", admBtnResetMenu:"Reset", placeholderId:"ID (eng, no spaces)", placeholderName:"Name", placeholderPrice:"Price", placeholderDesc:"Description", placeholderUrl:"Image URL", emptyCat:"There are no items in this category yet...", editModeText:"Price editing mode is active. Click on a price to edit.", editModeBtn:"Exit" },
+            az: { heroSubtitle:"Premium Lounge & Menyu", footer:"© 2026 CHILL BAR. Bütün hüquqlar qorunur.", admTitle:"İdarəetmə Paneli", admLabelEmail:"Email", admLabelPass:"Şifrə", admBtnLogin:"Daxil Ol", admBtnLogout:"Çıxış", admBlock1:"Menyu Bölmələri", admBtnCreateCat:"Kateqoriya Yarat", admLabelDelCat:"Kateqoriyanı sil:", admBtnDelCat:"Sil", admBlock2:"Yeni Mövqe Əlavə Et", admBtnPublish:"Dərc Et", admBlock3:"Mövqelərin Silinməsi", admBtnDelItem:"Sil", admLabelFastPrice:"Klik-Redaktor", admBtnClickEditor:"Aktivləşdir", admLabelReset:"Sıfırlamaq", admBtnResetMenu:"Sıfırla", placeholderId:"ID (ing, boşluqsuz)", placeholderName:"Adı", placeholderPrice:"Qiymət", placeholderDesc:"Təsviri", placeholderUrl:"Şəkil linki", emptyCat:"Bu kateqoriyada hələ heç bir mövqe yoxdur...", editModeText:"Qiymət redaktə rejimi aktivdir. Redaktə etmək üçün qiymətə klikləyin.", editModeBtn:"Çıxış" },
+        },
     };
-    
-    
+
     async function initializeSupabase() {
         try {
-            console.log("Fetching config from /api/config...");
+            console.log('Fetching config from /api/config...');
             const response = await fetch('/api/config');
             if (!response.ok) {
                 const errorText = await response.text();
@@ -863,16 +990,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (config.error || !config.supabaseUrl || !config.supabaseKey) {
                 throw new Error(`Invalid config from server: ${config.error || 'Missing keys'}`);
             }
-            console.log("Config received, initializing Supabase client...");
+            console.log('Config received, initializing Supabase client...');
             if (!window._supabaseClient) {
                 window._supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseKey);
             }
             db = window._supabaseClient;
-            App.state.db = db; // Сохраняем клиент в state
+            App.state.db = db;
             return true;
         } catch (error) {
             console.error('Supabase initialization failed:', error);
-            document.body.innerHTML = `<div style="color: red; text-align: center; margin-top: 50px;"><h1>Error: Could not connect to database.</h1><p style="font-size: 1.2em;">${error.message}</p><p>Please ensure environment variables (SUPABASE_URL, SUPABASE_ANON_KEY) are set correctly in your Vercel project.</p></div>`;
+            document.body.innerHTML = `
+                <div style="font-family:sans-serif;color:#ef4444;text-align:center;margin-top:80px;padding:2rem">
+                    <h1 style="font-size:1.5rem;margin-bottom:1rem">⚠ Could not connect to database</h1>
+                    <p style="color:#aaa;max-width:480px;margin:0 auto">${error.message}</p>
+                    <p style="color:#666;margin-top:1rem;font-size:0.9rem">Check that SUPABASE_URL and SUPABASE_ANON_KEY are set in Vercel project settings.</p>
+                </div>`;
             return false;
         }
     }
@@ -881,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loaded = await initializeSupabase();
         if (loaded) {
             window.app = App;
-            App.init.once();
+            App.init.once()
         }
     })();
 
