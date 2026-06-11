@@ -717,8 +717,36 @@ body.light .item-desc { color: rgba(100,80,20,0.45); }
 }
 .drag-handle:active { cursor: grabbing; }
 .price-value { display: inline-block; min-width: 1ch; }
-.price-value[contenteditable="true"] { outline: none; }
+.price-value[contenteditable="true"],
+.editable-text[contenteditable="true"] { outline: none; }
 .price-saving { opacity: 0.55; pointer-events: none; }
+.editable-text.text-edit-active {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 0.45rem;
+  cursor: text;
+  box-shadow: 0 1px 0 rgba(243,192,107,0.42);
+  transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+.editable-text.text-edit-active:hover,
+.editable-text.text-edit-active:focus {
+  color: #ffd891;
+  background: rgba(243,192,107,0.08);
+  box-shadow: 0 0 0 1px rgba(243,192,107,0.28), 0 0 16px rgba(243,192,107,0.08);
+}
+.cat-title.editable-text.text-edit-active {
+  padding: 0.12rem 0.35rem;
+  margin-left: -0.35rem;
+}
+.item-name.editable-text.text-edit-active {
+  padding: 0.08rem 0.22rem;
+  margin-left: -0.22rem;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.25;
+}
+.text-saving { opacity: 0.55; pointer-events: none; }
 .btn-busy,
 .btn-busy:hover {
   opacity: 0.7;
@@ -985,6 +1013,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const integer = raw.slice(0, firstDotIndex);
                 const decimal = raw.slice(firstDotIndex + 1).replace(/\./g, '').slice(0, 2);
                 return decimal ? `${integer}.${decimal}` : `${integer}.`;
+            },
+            normalizeEditableText(value) {
+                return String(value ?? '').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
             },
             placeCaretAtEnd(element) {
                 const selection = window.getSelection();
@@ -1499,6 +1530,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     card.appendChild(priceWrapper);
                 }
+                const itemName = card.querySelector('.item-name');
+                if (App.state.isPriceEditMode && itemName) {
+                    itemName.dataset.id = item.id;
+                    itemName.dataset.rawName = item.name || '';
+                    App.admin.activateTextEditor(itemName, App.admin.updateItemName);
+                }
                 return card;
             },
             async fullPage() {
@@ -1508,54 +1545,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 const success = await App.data.fetchMenu();
                 if (!success) return false;
 
-                requestAnimationFrame(() => {
-                    App.render.nav();
-                    const fragment = document.createDocumentFragment();
-                    const categories = App.state.menuData.categories[App.state.currentLang] || [];
-                    const items = App.state.menuData.items[App.state.currentLang] || [];
+                return await new Promise((resolve) => {
+                    requestAnimationFrame(() => {
+                        App.render.nav();
+                        const fragment = document.createDocumentFragment();
+                        const categories = App.state.menuData.categories[App.state.currentLang] || [];
+                        const items = App.state.menuData.items[App.state.currentLang] || [];
 
-                    categories.forEach(cat => {
-                        const section = document.createElement('section');
-                        section.id = cat.id;
-                        section.className = 'scroll-mt-24 space-y-4';
-                        section.innerHTML = `
-                            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem">
-                                <h2 class="cat-title">${App.utils.sanitize(cat.name)}</h2>
-                                <div class="cat-line"></div>
-                            </div>
-                        `;
-                        const itemsGrid = document.createElement('div');
-                        itemsGrid.className = 'grid sm:grid-cols-2 gap-4';
-                        itemsGrid.dataset.categoryId = cat.id;
-                        itemsGrid.dataset.categoryGrid = 'true';
-                        const categoryItems = items.filter(i => i.catId === cat.id);
-                        if (categoryItems.length > 0) {
-                            categoryItems.forEach(item => itemsGrid.appendChild(App.render.itemCard(item)));
-                        } else {
-                            itemsGrid.innerHTML = `<p style="font-size:0.75rem;color:rgba(150,150,150,0.5);font-style:italic;padding:0.5rem 0">${App.translations[App.state.currentLang].emptyCat}</p>`;
-                        }
-                        section.appendChild(itemsGrid);
-                        fragment.appendChild(section);
-                    });
-
-                    sectionsContainer.innerHTML = '';
-                    sectionsContainer.appendChild(fragment);
-                    App.init.animations();
-                    App.updateTexts();
-
-                    // FIX: карточки не появлялись — не было IntersectionObserver для .show
-                    const cardObs = new IntersectionObserver((entries) => {
-                        entries.forEach((e, i) => {
-                            if (e.isIntersecting) {
-                                setTimeout(() => e.target.classList.add('show'), i * 40);
-                                cardObs.unobserve(e.target);
+                        categories.forEach(cat => {
+                            const section = document.createElement('section');
+                            section.id = cat.id;
+                            section.className = 'scroll-mt-24 space-y-4';
+                            section.innerHTML = `
+                                <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem">
+                                    <h2 class="cat-title">${App.utils.sanitize(cat.name)}</h2>
+                                    <div class="cat-line"></div>
+                                </div>
+                            `;
+                            const categoryTitle = section.querySelector('.cat-title');
+                            if (App.state.isPriceEditMode && categoryTitle) {
+                                categoryTitle.dataset.id = cat.id;
+                                categoryTitle.dataset.rawName = cat.name || '';
+                                App.admin.activateTextEditor(categoryTitle, App.admin.updateCategoryName);
                             }
+                            const itemsGrid = document.createElement('div');
+                            itemsGrid.className = 'grid sm:grid-cols-2 gap-4';
+                            itemsGrid.dataset.categoryId = cat.id;
+                            itemsGrid.dataset.categoryGrid = 'true';
+                            const categoryItems = items.filter(i => i.catId === cat.id);
+                            if (categoryItems.length > 0) {
+                                categoryItems.forEach(item => itemsGrid.appendChild(App.render.itemCard(item)));
+                            } else {
+                                itemsGrid.innerHTML = `<p style="font-size:0.75rem;color:rgba(150,150,150,0.5);font-style:italic;padding:0.5rem 0">${App.translations[App.state.currentLang].emptyCat}</p>`;
+                            }
+                            section.appendChild(itemsGrid);
+                            fragment.appendChild(section);
                         });
-                    }, { threshold: 0.06 });
-                    App.dom.queryAll('.menu-card').forEach(card => cardObs.observe(card));
-                    App.admin.initSortables();
+
+                        sectionsContainer.innerHTML = '';
+                        sectionsContainer.appendChild(fragment);
+                        App.init.animations();
+                        App.updateTexts();
+
+                        // FIX: карточки не появлялись — не было IntersectionObserver для .show
+                        const cardObs = new IntersectionObserver((entries) => {
+                            entries.forEach((e, i) => {
+                                if (e.isIntersecting) {
+                                    setTimeout(() => e.target.classList.add('show'), i * 40);
+                                    cardObs.unobserve(e.target);
+                                }
+                            });
+                        }, { threshold: 0.06 });
+                        App.dom.queryAll('.menu-card').forEach(card => cardObs.observe(card));
+                        App.admin.initSortables();
+                        resolve(true);
+                    });
                 });
-                return true;
             },
         },
 
@@ -1709,6 +1754,101 @@ document.addEventListener('DOMContentLoaded', () => {
                     App.admin.render();
                 }
                 App.ui.success(successMessage || App.translations[App.state.currentLang].toastSaved);
+            },
+            activateTextEditor(element, updateHandler) {
+                element.classList.add('editable-text', 'text-edit-active');
+                element.contentEditable = 'true';
+                element.spellcheck = false;
+                element.addEventListener('input', App.admin.sanitizeTextInput);
+                element.addEventListener('keydown', updateHandler);
+                element.addEventListener('blur', updateHandler);
+            },
+            sanitizeTextInput(event) {
+                const target = event.target;
+                const normalized = String(target.textContent ?? '').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ');
+                if (target.textContent !== normalized) {
+                    target.textContent = normalized;
+                    App.utils.placeCaretAtEnd(target);
+                }
+            },
+            async updateEditableName(event, config) {
+                const t = App.translations[App.state.currentLang];
+                const target = event.target;
+                const entityId = target.dataset.id;
+                if (event.type === 'keydown') {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        target.blur();
+                    }
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        target.textContent = target.dataset.rawName || target.textContent;
+                        target.blur();
+                    }
+                    return;
+                }
+                if (!entityId) return;
+                const previousName = target.dataset.rawName || '';
+                const newName = App.utils.normalizeEditableText(target.textContent);
+                if (!newName) {
+                    target.textContent = previousName;
+                    App.ui.info(t.toastNameRequired);
+                    return;
+                }
+                target.textContent = newName;
+                if (newName === previousName) return;
+                const langColumn = `name_${App.state.currentLang}`;
+                const result = await App.admin.runAction(`${config.actionKey}-${entityId}-${App.state.currentLang}`, {
+                    loadingMessage: t.loadingSave,
+                    mutation: true,
+                }, async () => {
+                    target.classList.add('text-saving');
+                    await App.data.requireAuthForMutation();
+                    const payload = { id: entityId, [langColumn]: newName };
+                    const updated = await App.data.execute(
+                        config.table,
+                        config.operation,
+                        payload,
+                        App.state.db
+                            .from(config.table)
+                            .update({ [langColumn]: newName })
+                            .eq('id', entityId)
+                            .select(`id, ${langColumn}`)
+                            .maybeSingle()
+                    );
+                    App.data.ensureSavedRecord(updated, t.toastPermissionDenied);
+                    const saved = await config.fetchSaved(entityId);
+                    App.data.ensureSavedRecord(saved, t.toastSaveNotConfirmed);
+                    if (App.utils.normalizeEditableText(saved[langColumn]) !== newName) {
+                        throw new Error(t.toastSaveNotConfirmed);
+                    }
+                    target.dataset.rawName = newName;
+                    await App.admin.syncAfterMutation(config.successMessage);
+                });
+                target.classList.remove('text-saving');
+                if (!result?.ok) {
+                    target.textContent = previousName;
+                }
+            },
+            async updateItemName(event) {
+                const t = App.translations[App.state.currentLang];
+                return App.admin.updateEditableName(event, {
+                    table: 'items',
+                    operation: 'update-item-name',
+                    actionKey: 'item-name',
+                    fetchSaved: App.data.fetchItemById,
+                    successMessage: t.toastItemNameSaved,
+                });
+            },
+            async updateCategoryName(event) {
+                const t = App.translations[App.state.currentLang];
+                return App.admin.updateEditableName(event, {
+                    table: 'categories',
+                    operation: 'update-category-name',
+                    actionKey: 'category-name',
+                    fetchSaved: App.data.fetchCategoryById,
+                    successMessage: t.toastCategoryNameSaved,
+                });
             },
             clearItemForm() {
                 ['add-item-name', 'add-item-price', 'add-item-desc'].forEach(id => {
@@ -2130,6 +2270,28 @@ document.addEventListener('DOMContentLoaded', () => {
             },
         },
     };
+
+    Object.assign(App.translations.ru, {
+        admLabelFastPrice: 'Клик-редактор цен и названий',
+        editModeText: 'Режим редактирования активен. Кликните на цену, название блюда или категорию.',
+        toastItemNameSaved: 'Название блюда сохранено.',
+        toastCategoryNameSaved: 'Название категории сохранено.',
+        toastNameRequired: 'Название не может быть пустым.',
+    });
+    Object.assign(App.translations.en, {
+        admLabelFastPrice: 'Quick price & name editor',
+        editModeText: 'Editing mode is active. Click a price, dish name, or category.',
+        toastItemNameSaved: 'Dish name saved.',
+        toastCategoryNameSaved: 'Category name saved.',
+        toastNameRequired: 'Name cannot be empty.',
+    });
+    Object.assign(App.translations.az, {
+        admLabelFastPrice: 'Qiymət və ad redaktoru',
+        editModeText: 'Redaktə rejimi aktivdir. Qiymətə, yemək adına və ya kateqoriyaya klikləyin.',
+        toastItemNameSaved: 'Yemək adı yadda saxlanıldı.',
+        toastCategoryNameSaved: 'Kateqoriya adı yadda saxlanıldı.',
+        toastNameRequired: 'Ad boş ola bilməz.',
+    });
 
     async function initializeSupabase() {
         try {
