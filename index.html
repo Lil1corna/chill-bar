@@ -619,7 +619,8 @@ document.addEventListener('DOMContentLoaded', () => {
             menuData: { categories: {ru:[],en:[],az:[]}, items: {ru:[],en:[],az:[]} },
             currentUser: null,
             db: null,
-            supabaseConfig: { storageBucket: 'menu-images' },
+            supabaseConfig: { url: '', keyPreview: '', projectRef: '', storageBucket: 'menu-images' },
+            debugSupabase: false,
             isPriceEditMode: false,
             isReorderingMode: false,
             hasPositionColumn: null,
@@ -693,6 +694,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 const extension = String(file.name || 'jpg').split('.').pop().toLowerCase() || 'jpg';
                 return `items/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
             },
+            maskKey(key) {
+                if (!key || key.length < 12) return 'not-set';
+                return `${key.slice(0, 8)}...${key.slice(-6)}`;
+            },
+            projectRefFromUrl(url) {
+                try {
+                    return new URL(url).hostname.split('.')[0] || '';
+                } catch (_error) {
+                    return '';
+                }
+            },
+            isPermissionError(error) {
+                const status = Number(error?.status || error?.code || 0);
+                const message = String(error?.message || error || '').toLowerCase();
+                return [401, 403, 42501].includes(status)
+                    || message.includes('row-level security')
+                    || message.includes('permission denied')
+                    || message.includes('not authorized')
+                    || message.includes('jwt');
+            },
+            safeDebugPayload(payload) {
+                if (payload instanceof File) {
+                    return { name: payload.name, type: payload.type, size: payload.size };
+                }
+                if (Array.isArray(payload)) return payload.map(item => App.utils.safeDebugPayload(item));
+                if (payload && typeof payload === 'object') {
+                    return Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, App.utils.safeDebugPayload(value)]));
+                }
+                return payload;
+            },
         },
 
         ui: {
@@ -720,7 +751,11 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             handleError(error, fallbackMessage) {
                 console.error(error);
-                const message = error?.message || fallbackMessage || App.translations[App.state.currentLang].toastGenericError;
+                const t = App.translations[App.state.currentLang];
+                let message = error?.message || fallbackMessage || t.toastGenericError;
+                if (App.utils.isPermissionError(error)) {
+                    message = t.toastPermissionDenied;
+                }
                 App.ui.error(message);
             },
             setGlobalLoading(isLoading, message) {
@@ -754,7 +789,90 @@ document.addEventListener('DOMContentLoaded', () => {
             },
         },
 
+        debug: {
+            log(title, details = {}) {
+                if (!App.state.debugSupabase) return;
+                console.groupCollapsed(`[CHILL BAR Supabase] ${title}`);
+                Object.entries(details).forEach(([key, value]) => console.log(key, value));
+                console.groupEnd();
+            },
+            request(table, operation, payload, response) {
+                App.debug.log(`${table}.${operation}`, {
+                    project: App.state.supabaseConfig.projectRef,
+                    url: App.state.supabaseConfig.url,
+                    table,
+                    payload: App.utils.safeDebugPayload(payload),
+                    response,
+                });
+            },
+        },
+
         data: {
+            async execute(table, operation, payload, request) {
+                App.debug.request(table, operation, payload, { status: 'request' });
+                const response = await request;
+                App.debug.request(table, operation, payload, response);
+                if (response.error) throw response.error;
+                return response.data;
+            },
+            async requireAuthForMutation() {
+                const { data, error } = await App.state.db.auth.getSession();
+                if (error) throw error;
+                App.state.currentUser = data?.session?.user || null;
+                if (!App.state.currentUser) {
+                    throw new Error(App.translations[App.state.currentLang].toastPermissionDenied);
+                }
+            },
+            ensureSavedRecord(record, message) {
+                if (!record) {
+                    throw new Error(message || App.translations[App.state.currentLang].toastSaveNotConfirmed);
+                }
+                return record;
+            },
+            ensureSavedRows(rows, message) {
+                if (!Array.isArray(rows) || rows.length === 0 || rows.some(row => !row)) {
+                    throw new Error(message || App.translations[App.state.currentLang].toastSaveNotConfirmed);
+                }
+                return rows;
+            },
+            async fetchCategoryById(id) {
+                const data = await App.data.execute(
+                    'categories',
+                    'select-by-id',
+                    { id },
+                    App.state.db.from('categories').select('*').eq('id', id).maybeSingle()
+                );
+                return data || null;
+            },
+            async fetchItemById(id) {
+                const data = await App.data.execute(
+                    'items',
+                    'select-by-id',
+                    { id },
+                    App.state.db.from('items').select('*').eq('id', id).maybeSingle()
+                );
+                return data || null;
+            },
+            async fetchItemsByCategory(categoryId) {
+                let query = App.state.db.from('items').select('*').eq('category_id', categoryId);
+                if (App.state.hasPositionColumn) {
+                    query = query.order('position', { ascending: true }).order('id', { ascending: true });
+                }
+                const data = await App.data.execute('items', 'select-by-category', { categoryId }, query);
+                return data || [];
+            },
+            async assertNoCategory(id) {
+                const category = await App.data.fetchCategoryById(id);
+                if (category) throw new Error(App.translations[App.state.currentLang].toastDeleteNotConfirmed);
+            },
+            async assertNoItem(id) {
+                const item = await App.data.fetchItemById(id);
+                if (item) throw new Error(App.translations[App.state.currentLang].toastDeleteNotConfirmed);
+            },
+            async assertNoItemsInCategory(categoryId) {
+                const items = await App.data.fetchItemsByCategory(categoryId);
+                if (items.length > 0) throw new Error(App.translations[App.state.currentLang].toastDeleteNotConfirmed);
+            },
             async detectPositionColumn() {
                 if (App.state.hasPositionColumn !== null) return App.state.hasPositionColumn;
                 const { error } = await App.state.db.from('items').select('position').limit(1);
@@ -770,6 +888,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             async fetchMenu() {
                 const { data: categories, error: catError } = await App.state.db.from('categories').select('*');
+                App.debug.request('categories', 'select-menu', null, { data: categories, error: catError });
 
                 let itemsQuery = App.state.db.from('items').select('*');
                 if (App.state.hasPositionColumn) {
@@ -779,10 +898,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         .order('id', { ascending: true });
                 }
                 let { data: items, error: itemsError } = await itemsQuery;
+                App.debug.request('items', 'select-menu', null, { data: items, error: itemsError });
 
                 if (itemsError && App.state.hasPositionColumn && /position/i.test(itemsError.message)) {
                     App.state.hasPositionColumn = false;
                     ({ data: items, error: itemsError } = await App.state.db.from('items').select('*'));
+                    App.debug.request('items', 'select-menu-without-position', null, { data: items, error: itemsError });
                 }
 
                 if (catError || itemsError) {
@@ -818,48 +939,48 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             async getNextPosition(categoryId) {
                 if (!App.state.hasPositionColumn) return null;
-                const { data, error } = await App.state.db
-                    .from('items')
-                    .select('position')
-                    .eq('category_id', categoryId)
-                    .order('position', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                if (error) throw error;
+                const data = await App.data.execute(
+                    'items',
+                    'select-next-position',
+                    { categoryId },
+                    App.state.db
+                        .from('items')
+                        .select('position')
+                        .eq('category_id', categoryId)
+                        .order('position', { ascending: false })
+                        .limit(1)
+                        .maybeSingle()
+                );
                 return Number(data?.position || 0) + 1;
-            },
-            patchLocalItem(itemId, patch) {
-                ['ru', 'en', 'az'].forEach(lang => {
-                    const target = App.state.menuData.items[lang].find(item => String(item.id) === String(itemId));
-                    if (target) Object.assign(target, patch);
-                });
-            },
-            patchLocalOrder(categoryId, orderedIds) {
-                const positions = new Map(orderedIds.map((id, index) => [String(id), index + 1]));
-                ['ru', 'en', 'az'].forEach(lang => {
-                    App.state.menuData.items[lang].forEach(item => {
-                        if (String(item.catId) === String(categoryId) && positions.has(String(item.id))) {
-                            item.position = positions.get(String(item.id));
-                        }
-                    });
-                    App.state.menuData.items[lang] = App.utils.sortItems(App.state.menuData.items[lang]);
-                });
             },
             async normalizeCategoryPositions(categoryId) {
                 if (!App.state.hasPositionColumn) return;
-                const { data, error } = await App.state.db
-                    .from('items')
-                    .select('id')
-                    .eq('category_id', categoryId)
-                    .order('position', { ascending: true })
-                    .order('id', { ascending: true });
-                if (error) throw error;
-                const updates = (data || []).map((item, index) =>
-                    App.state.db.from('items').update({ position: index + 1 }).eq('id', item.id)
-                );
+                const data = await App.data.fetchItemsByCategory(categoryId);
+                if (!data.length) return;
+                const updates = (data || []).map((item, index) => App.data.execute(
+                    'items',
+                    'normalize-position',
+                    { id: item.id, category_id: categoryId, position: index + 1 },
+                    App.state.db
+                        .from('items')
+                        .update({ position: index + 1 })
+                        .eq('id', item.id)
+                        .eq('category_id', categoryId)
+                        .select('id, category_id, position')
+                        .maybeSingle()
+                ));
                 const results = await Promise.all(updates);
-                const failed = results.find(result => result.error);
-                if (failed?.error) throw failed.error;
+                App.data.ensureSavedRows(results, App.translations[App.state.currentLang].toastSaveNotConfirmed);
+            },
+            async verifyCategoryOrder(categoryId, orderedIds) {
+                if (!App.state.hasPositionColumn) return;
+                const items = await App.data.fetchItemsByCategory(categoryId);
+                const savedIds = items.map(item => String(item.id));
+                const sameOrder = orderedIds.every((id, index) => String(id) === savedIds[index]);
+                const positionsOk = items.every((item, index) => Number(item.position) === index + 1);
+                if (!sameOrder || !positionsOk) {
+                    throw new Error(App.translations[App.state.currentLang].toastOrderNotConfirmed);
+                }
             },
         },
 
@@ -872,15 +993,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const bucket = App.state.supabaseConfig.storageBucket || App.config.storageBucket;
                 const filePath = App.utils.buildStoragePath(file);
-                const { error: uploadError } = await App.state.db.storage
+                App.debug.request('storage.objects', 'upload', { bucket, filePath, file }, { status: 'request' });
+                const { data: uploadData, error: uploadError } = await App.state.db.storage
                     .from(bucket)
                     .upload(filePath, file, {
                         cacheControl: '3600',
                         upsert: false,
                         contentType: file.type || undefined,
                     });
+                App.debug.request('storage.objects', 'upload', { bucket, filePath, file }, { data: uploadData, error: uploadError });
                 if (uploadError) throw uploadError;
                 const { data } = App.state.db.storage.from(bucket).getPublicUrl(filePath);
+                App.debug.request('storage.objects', 'get-public-url', { bucket, filePath }, { data, error: null });
                 if (!data?.publicUrl) {
                     throw new Error(t.toastImageUrlError);
                 }
@@ -1040,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sectionsContainer.innerHTML = App.render.skeletons();
 
                 const success = await App.data.fetchMenu();
-                if (!success) return;
+                if (!success) return false;
 
                 requestAnimationFrame(() => {
                     App.render.nav();
@@ -1089,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     App.dom.queryAll('.menu-card').forEach(card => cardObs.observe(card));
                     App.admin.initSortables();
                 });
+                return true;
             },
         },
 
@@ -1214,7 +1339,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const value = await callback();
                     return { ok: true, value };
                 } catch (error) {
-                    App.ui.handleError(error, options?.fallbackMessage);
+                    const fallbackMessage = options?.fallbackMessage
+                        || (options?.mutation ? App.translations[App.state.currentLang].toastSaveError : undefined);
+                    App.ui.handleError(error, fallbackMessage);
                     return { ok: false, error };
                 } finally {
                     App.state.pendingActions.delete(key);
@@ -1223,11 +1350,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             async syncAfterMutation(successMessage) {
-                await App.render.fullPage();
+                const refreshed = await App.render.fullPage();
+                if (!refreshed) {
+                    throw new Error(App.translations[App.state.currentLang].toastRefreshAfterSaveError);
+                }
                 if (!App.dom.get('step-dashboard').classList.contains('hidden')) {
                     App.admin.render();
                 }
-                if (successMessage) App.ui.success(successMessage);
+                App.ui.success(successMessage || App.translations[App.state.currentLang].toastSaved);
             },
             clearItemForm() {
                 ['add-item-name', 'add-item-price', 'add-item-desc'].forEach(id => {
@@ -1249,9 +1379,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     button: App.dom.get('create-cat-btn'),
                     loadingText: t.loadingSave,
                     loadingMessage: t.loadingSave,
+                    mutation: true,
                 }, async () => {
-                    const { error } = await App.state.db.from('categories').insert({ id, name_ru: name, name_en: name, name_az: name });
-                    if (error) throw error;
+                    await App.data.requireAuthForMutation();
+                    const payload = { id, name_ru: name, name_en: name, name_az: name };
+                    const inserted = await App.data.execute(
+                        'categories',
+                        'insert',
+                        payload,
+                        App.state.db.from('categories').insert(payload).select('*').single()
+                    );
+                    App.data.ensureSavedRecord(inserted, t.toastSaveNotConfirmed);
+                    const saved = await App.data.fetchCategoryById(id);
+                    App.data.ensureSavedRecord(saved, t.toastSaveNotConfirmed);
                     App.dom.get('new-cat-id').value = '';
                     App.dom.get('new-cat-name').value = '';
                     await App.admin.syncAfterMutation(t.toastCategoryCreated);
@@ -1265,11 +1405,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     button: App.dom.get('delete-cat-btn'),
                     loadingText: t.loadingDelete,
                     loadingMessage: t.loadingDelete,
+                    mutation: true,
                 }, async () => {
-                    const { error: itemsError } = await App.state.db.from('items').delete().eq('category_id', catId);
-                    if (itemsError) throw itemsError;
-                    const { error } = await App.state.db.from('categories').delete().eq('id', catId);
-                    if (error) throw error;
+                    await App.data.requireAuthForMutation();
+                    const existing = await App.data.fetchCategoryById(catId);
+                    App.data.ensureSavedRecord(existing, t.toastDeleteNotConfirmed);
+                    const existingItems = await App.data.fetchItemsByCategory(catId);
+                    const deletedItems = await App.data.execute(
+                        'items',
+                        'delete-by-category',
+                        { category_id: catId },
+                        App.state.db.from('items').delete().eq('category_id', catId).select('id, category_id')
+                    );
+                    if (existingItems.length > 0 && deletedItems.length !== existingItems.length) {
+                        throw new Error(t.toastPermissionDenied);
+                    }
+                    await App.data.assertNoItemsInCategory(catId);
+                    const deleted = await App.data.execute(
+                        'categories',
+                        'delete',
+                        { id: catId },
+                        App.state.db.from('categories').delete().eq('id', catId).select('id').maybeSingle()
+                    );
+                    App.data.ensureSavedRecord(deleted, t.toastPermissionDenied);
+                    await App.data.assertNoCategory(catId);
                     await App.admin.syncAfterMutation(t.toastCategoryDeleted);
                 });
             },
@@ -1288,7 +1447,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     button: App.dom.get('add-item-btn'),
                     loadingText: t.loadingUpload,
                     loadingMessage: imageFile ? t.loadingUpload : t.loadingSave,
+                    mutation: true,
                 }, async () => {
+                    await App.data.requireAuthForMutation();
                     const payload = {
                         category_id: catId,
                         name_ru: name, name_en: name, name_az: name,
@@ -1302,8 +1463,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (App.state.hasPositionColumn) {
                         payload.position = await App.data.getNextPosition(catId);
                     }
-                    const { error } = await App.state.db.from('items').insert(payload);
-                    if (error) throw error;
+                    const inserted = await App.data.execute(
+                        'items',
+                        'insert',
+                        payload,
+                        App.state.db.from('items').insert(payload).select('*').single()
+                    );
+                    App.data.ensureSavedRecord(inserted, t.toastSaveNotConfirmed);
+                    const saved = await App.data.fetchItemById(inserted.id);
+                    App.data.ensureSavedRecord(saved, t.toastSaveNotConfirmed);
                     App.admin.clearItemForm();
                     await App.admin.syncAfterMutation(t.toastItemCreated);
                 });
@@ -1317,9 +1485,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     button: App.dom.get('delete-item-btn'),
                     loadingText: t.loadingDelete,
                     loadingMessage: t.loadingDelete,
+                    mutation: true,
                 }, async () => {
-                    const { error } = await App.state.db.from('items').delete().eq('id', itemId);
-                    if (error) throw error;
+                    await App.data.requireAuthForMutation();
+                    const existing = await App.data.fetchItemById(itemId);
+                    App.data.ensureSavedRecord(existing, t.toastDeleteNotConfirmed);
+                    const deleted = await App.data.execute(
+                        'items',
+                        'delete',
+                        { id: itemId },
+                        App.state.db.from('items').delete().eq('id', itemId).select('id').maybeSingle()
+                    );
+                    App.data.ensureSavedRecord(deleted, t.toastPermissionDenied);
+                    await App.data.assertNoItem(itemId);
                     if (currentItem?.catId) await App.data.normalizeCategoryPositions(currentItem.catId);
                     await App.admin.syncAfterMutation(t.toastItemDeleted);
                 });
@@ -1418,39 +1596,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 const normalizedPrice = App.utils.formatPrice(newPrice);
                 target.textContent = normalizedPrice;
                 if (normalizedPrice === previousPrice) return;
-                await App.admin.runAction(`price-${itemId}`, {
+                const result = await App.admin.runAction(`price-${itemId}`, {
                     loadingMessage: t.loadingSave,
+                    mutation: true,
                 }, async () => {
                     target.classList.add('price-saving');
-                    const { error } = await App.state.db.from('items').update({ price: newPrice }).eq('id', itemId);
-                    if (error) throw error;
+                    await App.data.requireAuthForMutation();
+                    const updated = await App.data.execute(
+                        'items',
+                        'update-price',
+                        { id: itemId, price: newPrice },
+                        App.state.db.from('items').update({ price: newPrice }).eq('id', itemId).select('id, price').maybeSingle()
+                    );
+                    App.data.ensureSavedRecord(updated, t.toastPermissionDenied);
+                    const saved = await App.data.fetchItemById(itemId);
+                    App.data.ensureSavedRecord(saved, t.toastSaveNotConfirmed);
+                    if (App.utils.formatPrice(saved.price) !== normalizedPrice) {
+                        throw new Error(t.toastSaveNotConfirmed);
+                    }
                     target.dataset.rawPrice = normalizedPrice;
-                    App.data.patchLocalItem(itemId, { price: normalizedPrice });
-                    App.ui.success(t.toastPriceSaved);
+                    await App.admin.syncAfterMutation(t.toastPriceSaved);
                 });
                 target.classList.remove('price-saving');
-                if (App.state.pendingActions.has(`price-${itemId}`)) return;
-                target.textContent = target.dataset.rawPrice || previousPrice;
+                if (!result?.ok) {
+                    target.textContent = previousPrice;
+                }
             },
             async handleSortEnd(event) {
                 const categoryId = event.to.dataset.categoryId;
                 const orderedIds = [...event.to.querySelectorAll('.menu-card')].map(card => card.dataset.itemId);
+                if (event.oldIndex === event.newIndex) return;
                 const result = await App.admin.runAction(`reorder-${categoryId}`, {
                     loadingMessage: App.translations[App.state.currentLang].loadingOrder,
+                    mutation: true,
                 }, async () => {
                     App.admin.setSortablesDisabled(true);
+                    await App.data.requireAuthForMutation();
                     const updates = orderedIds.map((itemId, index) =>
-                        App.state.db
-                            .from('items')
-                            .update({ position: index + 1 })
-                            .eq('id', itemId)
-                            .eq('category_id', categoryId)
+                        App.data.execute(
+                            'items',
+                            'update-position',
+                            { id: itemId, category_id: categoryId, position: index + 1 },
+                            App.state.db
+                                .from('items')
+                                .update({ position: index + 1 })
+                                .eq('id', itemId)
+                                .eq('category_id', categoryId)
+                                .select('id, category_id, position')
+                                .maybeSingle()
+                        )
                     );
                     const results = await Promise.all(updates);
-                    const failed = results.find(result => result.error);
-                    if (failed?.error) throw failed.error;
-                    App.data.patchLocalOrder(categoryId, orderedIds);
-                    App.ui.success(App.translations[App.state.currentLang].toastOrderSaved);
+                    App.data.ensureSavedRows(results, App.translations[App.state.currentLang].toastOrderNotConfirmed);
+                    await App.data.verifyCategoryOrder(categoryId, orderedIds);
+                    await App.admin.syncAfterMutation(App.translations[App.state.currentLang].toastOrderSaved);
                 });
                 App.admin.setSortablesDisabled(false);
                 if (!result?.ok) {
@@ -1544,36 +1743,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
         translations: {
             ru: {
-                heroSubtitle:"Premium Lounge & Меню", footer:"© 2026 CHILL BAR. Все права защищены.", admTitle:"Панель Управления", admLabelEmail:"Email", admLabelPass:"Пароль", admBtnLogin:"Войти", admBtnLogout:"Выйти", admBlock1:"Разделы меню", admBtnCreateCat:"Создать категорию", admLabelDelCat:"Удалить категорию:", admBtnDelCat:"Удалить", admBlock2:"Добавление позиции", admBtnPublish:"Опубликовать", admBlock3:"Удаление позиций", admBtnDelItem:"Удалить", admLabelFastPrice:"Клик-редактор цен", admBtnClickEditor:"Активировать", admLabelReorder:"Изменение порядка", admBtnReorder:"Изменить порядок блюд", admLabelReset:"Сброс", admBtnResetMenu:"Сбросить", admLabelPhoto:"Фото блюда", admHintPhoto:"Поддерживаются JPG, PNG и WEBP. Файл загрузится в Supabase Storage автоматически.", placeholderId:"ID (eng, no spaces)", placeholderName:"Название", placeholderPrice:"Цена", placeholderDesc:"Описание", placeholderUrl:"Ссылка на фото", emptyCat:"В этой категории пока нет позиций...", editModeText:"Режим изменения цен активен. Кликните на число для редактирования.", editModeBtn:"Выйти", reorderModeText:"Режим сортировки активен. Перетаскивайте блюда внутри категории.", reorderModeBtn:"Готово", loadingSave:"Сохранение...", loadingUpload:"Загрузка фото...", loadingDelete:"Удаление...", loadingOrder:"Сохраняем порядок...", loadingLogin:"Вход...", loadingLogout:"Выход...", toastGenericError:"Не удалось выполнить действие. Попробуйте ещё раз.", toastMenuLoadError:"Не удалось загрузить меню из базы данных.", toastCategoryRequired:"Введите ID и название категории.", toastItemRequired:"Введите название и корректную цену блюда.", toastPriceSaved:"Цена успешно сохранена.", toastItemCreated:"Блюдо успешно добавлено.", toastItemDeleted:"Блюдо удалено.", toastCategoryCreated:"Категория создана.", toastCategoryDeleted:"Категория удалена.", toastOrderSaved:"Новый порядок блюд сохранён.", toastResetHint:"Сброс меню оставлен через SQL/резервное копирование, чтобы не ломать текущие данные.", toastInvalidPrice:"Введите только числовое значение цены.", toastReorderRequiresPosition:"Для сортировки нужно добавить поле position в таблицу items.", toastReorderHint:"Перетаскивайте блюда за иконку ☰.", toastImageTypeError:"Поддерживаются только JPG, PNG и WEBP.", toastImageUrlError:"Не удалось получить публичную ссылку изображения.", toastLoginSuccess:"Вход выполнен.", toastLogoutSuccess:"Вы вышли из панели администратора.", confirmDeleteCategory:"Удалить категорию и все блюда внутри неё?", confirmDeleteItem:"Удалить это блюдо?"
+                heroSubtitle:"Premium Lounge & Меню", footer:"© 2026 CHILL BAR. Все права защищены.", admTitle:"Панель Управления", admLabelEmail:"Email", admLabelPass:"Пароль", admBtnLogin:"Войти", admBtnLogout:"Выйти", admBlock1:"Разделы меню", admBtnCreateCat:"Создать категорию", admLabelDelCat:"Удалить категорию:", admBtnDelCat:"Удалить", admBlock2:"Добавление позиции", admBtnPublish:"Опубликовать", admBlock3:"Удаление позиций", admBtnDelItem:"Удалить", admLabelFastPrice:"Клик-редактор цен", admBtnClickEditor:"Активировать", admLabelReorder:"Изменение порядка", admBtnReorder:"Изменить порядок блюд", admLabelReset:"Сброс", admBtnResetMenu:"Сбросить", admLabelPhoto:"Фото блюда", admHintPhoto:"Поддерживаются JPG, PNG и WEBP. Файл загрузится в Supabase Storage автоматически.", placeholderId:"ID (eng, no spaces)", placeholderName:"Название", placeholderPrice:"Цена", placeholderDesc:"Описание", placeholderUrl:"Ссылка на фото", emptyCat:"В этой категории пока нет позиций...", editModeText:"Режим изменения цен активен. Кликните на число для редактирования.", editModeBtn:"Выйти", reorderModeText:"Режим сортировки активен. Перетаскивайте блюда внутри категории.", reorderModeBtn:"Готово", loadingSave:"Сохранение...", loadingUpload:"Загрузка фото...", loadingDelete:"Удаление...", loadingOrder:"Сохраняем порядок...", loadingLogin:"Вход...", loadingLogout:"Выход...", toastGenericError:"Не удалось выполнить действие. Попробуйте ещё раз.", toastSaved:"Сохранено.", toastSaveNotConfirmed:"Supabase не подтвердил сохранение данных.", toastDeleteNotConfirmed:"Supabase не подтвердил удаление данных.", toastOrderNotConfirmed:"Supabase не подтвердил новый порядок блюд.", toastRefreshAfterSaveError:"Данные сохранены, но меню не удалось перечитать из Supabase.", toastPermissionDenied:"Нет прав на изменение данных. Проверьте вход администратора и RLS policies.", toastSaveError:"Ошибка сохранения.", toastMenuLoadError:"Не удалось загрузить меню из базы данных.", toastCategoryRequired:"Введите ID и название категории.", toastItemRequired:"Введите название и корректную цену блюда.", toastPriceSaved:"Цена успешно сохранена.", toastItemCreated:"Блюдо успешно добавлено.", toastItemDeleted:"Блюдо удалено.", toastCategoryCreated:"Категория создана.", toastCategoryDeleted:"Категория удалена.", toastOrderSaved:"Новый порядок блюд сохранён.", toastResetHint:"Сброс меню оставлен через SQL/резервное копирование, чтобы не ломать текущие данные.", toastInvalidPrice:"Введите только числовое значение цены.", toastReorderRequiresPosition:"Для сортировки нужно добавить поле position в таблицу items.", toastReorderHint:"Перетаскивайте блюда за иконку ☰.", toastImageTypeError:"Поддерживаются только JPG, PNG и WEBP.", toastImageUrlError:"Не удалось получить публичную ссылку изображения.", toastLoginSuccess:"Вход выполнен.", toastLogoutSuccess:"Вы вышли из панели администратора.", confirmDeleteCategory:"Удалить категорию и все блюда внутри неё?", confirmDeleteItem:"Удалить это блюдо?"
             },
             en: {
-                heroSubtitle:"Premium Lounge & Menu", footer:"© 2026 CHILL BAR. All rights reserved.", admTitle:"Control Panel", admLabelEmail:"Email", admLabelPass:"Password", admBtnLogin:"Login", admBtnLogout:"Logout", admBlock1:"Menu Sections", admBtnCreateCat:"Create Category", admLabelDelCat:"Delete category:", admBtnDelCat:"Delete", admBlock2:"Add New Item", admBtnPublish:"Publish", admBlock3:"Delete Items", admBtnDelItem:"Delete", admLabelFastPrice:"Quick Price Editor", admBtnClickEditor:"Activate", admLabelReorder:"Item Ordering", admBtnReorder:"Reorder Dishes", admLabelReset:"Reset Data", admBtnResetMenu:"Reset", admLabelPhoto:"Dish photo", admHintPhoto:"JPG, PNG and WEBP are supported. The file uploads to Supabase Storage automatically.", placeholderId:"ID (eng, no spaces)", placeholderName:"Name", placeholderPrice:"Price", placeholderDesc:"Description", placeholderUrl:"Image URL", emptyCat:"There are no items in this category yet...", editModeText:"Price editing mode is active. Click the number to edit it.", editModeBtn:"Exit", reorderModeText:"Ordering mode is active. Drag dishes inside the category.", reorderModeBtn:"Done", loadingSave:"Saving...", loadingUpload:"Uploading image...", loadingDelete:"Deleting...", loadingOrder:"Saving order...", loadingLogin:"Signing in...", loadingLogout:"Signing out...", toastGenericError:"The action could not be completed. Please try again.", toastMenuLoadError:"Failed to load the menu from the database.", toastCategoryRequired:"Enter a category ID and name.", toastItemRequired:"Enter a dish name and a valid price.", toastPriceSaved:"Price saved successfully.", toastItemCreated:"Dish added successfully.", toastItemDeleted:"Dish deleted.", toastCategoryCreated:"Category created.", toastCategoryDeleted:"Category deleted.", toastOrderSaved:"Dish order saved.", toastResetHint:"Menu reset remains available via SQL/backup to keep existing data safe.", toastInvalidPrice:"Enter numbers only for the price.", toastReorderRequiresPosition:"Add the position column to the items table to enable ordering.", toastReorderHint:"Drag dishes by the ☰ handle.", toastImageTypeError:"Only JPG, PNG and WEBP files are supported.", toastImageUrlError:"Could not get the public image URL.", toastLoginSuccess:"Signed in successfully.", toastLogoutSuccess:"You are signed out of the admin panel.", confirmDeleteCategory:"Delete the category and all dishes inside it?", confirmDeleteItem:"Delete this dish?"
+                heroSubtitle:"Premium Lounge & Menu", footer:"© 2026 CHILL BAR. All rights reserved.", admTitle:"Control Panel", admLabelEmail:"Email", admLabelPass:"Password", admBtnLogin:"Login", admBtnLogout:"Logout", admBlock1:"Menu Sections", admBtnCreateCat:"Create Category", admLabelDelCat:"Delete category:", admBtnDelCat:"Delete", admBlock2:"Add New Item", admBtnPublish:"Publish", admBlock3:"Delete Items", admBtnDelItem:"Delete", admLabelFastPrice:"Quick Price Editor", admBtnClickEditor:"Activate", admLabelReorder:"Item Ordering", admBtnReorder:"Reorder Dishes", admLabelReset:"Reset Data", admBtnResetMenu:"Reset", admLabelPhoto:"Dish photo", admHintPhoto:"JPG, PNG and WEBP are supported. The file uploads to Supabase Storage automatically.", placeholderId:"ID (eng, no spaces)", placeholderName:"Name", placeholderPrice:"Price", placeholderDesc:"Description", placeholderUrl:"Image URL", emptyCat:"There are no items in this category yet...", editModeText:"Price editing mode is active. Click the number to edit it.", editModeBtn:"Exit", reorderModeText:"Ordering mode is active. Drag dishes inside the category.", reorderModeBtn:"Done", loadingSave:"Saving...", loadingUpload:"Uploading image...", loadingDelete:"Deleting...", loadingOrder:"Saving order...", loadingLogin:"Signing in...", loadingLogout:"Signing out...", toastGenericError:"The action could not be completed. Please try again.", toastSaved:"Saved.", toastSaveNotConfirmed:"Supabase did not confirm that the data was saved.", toastDeleteNotConfirmed:"Supabase did not confirm that the data was deleted.", toastOrderNotConfirmed:"Supabase did not confirm the new dish order.", toastRefreshAfterSaveError:"Data was saved, but the menu could not be reloaded from Supabase.", toastPermissionDenied:"No permission to change data. Check admin login and RLS policies.", toastSaveError:"Save error.", toastMenuLoadError:"Failed to load the menu from the database.", toastCategoryRequired:"Enter a category ID and name.", toastItemRequired:"Enter a dish name and a valid price.", toastPriceSaved:"Price saved successfully.", toastItemCreated:"Dish added successfully.", toastItemDeleted:"Dish deleted.", toastCategoryCreated:"Category created.", toastCategoryDeleted:"Category deleted.", toastOrderSaved:"Dish order saved.", toastResetHint:"Menu reset remains available via SQL/backup to keep existing data safe.", toastInvalidPrice:"Enter numbers only for the price.", toastReorderRequiresPosition:"Add the position column to the items table to enable ordering.", toastReorderHint:"Drag dishes by the ☰ handle.", toastImageTypeError:"Only JPG, PNG and WEBP files are supported.", toastImageUrlError:"Could not get the public image URL.", toastLoginSuccess:"Signed in successfully.", toastLogoutSuccess:"You are signed out of the admin panel.", confirmDeleteCategory:"Delete the category and all dishes inside it?", confirmDeleteItem:"Delete this dish?"
             },
             az: {
-                heroSubtitle:"Premium Lounge & Menyu", footer:"© 2026 CHILL BAR. Bütün hüquqlar qorunur.", admTitle:"İdarəetmə Paneli", admLabelEmail:"Email", admLabelPass:"Şifrə", admBtnLogin:"Daxil Ol", admBtnLogout:"Çıxış", admBlock1:"Menyu Bölmələri", admBtnCreateCat:"Kateqoriya Yarat", admLabelDelCat:"Kateqoriyanı sil:", admBtnDelCat:"Sil", admBlock2:"Yeni Mövqe Əlavə Et", admBtnPublish:"Dərc Et", admBlock3:"Mövqelərin Silinməsi", admBtnDelItem:"Sil", admLabelFastPrice:"Klik-Redaktor", admBtnClickEditor:"Aktivləşdir", admLabelReorder:"Sıralamanın dəyişdirilməsi", admBtnReorder:"Yeməklərin sırasını dəyiş", admLabelReset:"Sıfırlamaq", admBtnResetMenu:"Sıfırla", admLabelPhoto:"Yemək şəkli", admHintPhoto:"JPG, PNG və WEBP dəstəklənir. Fayl avtomatik Supabase Storage-a yüklənəcək.", placeholderId:"ID (ing, boşluqsuz)", placeholderName:"Adı", placeholderPrice:"Qiymət", placeholderDesc:"Təsviri", placeholderUrl:"Şəkil linki", emptyCat:"Bu kateqoriyada hələ heç bir mövqe yoxdur...", editModeText:"Qiymət redaktə rejimi aktivdir. Redaktə üçün rəqəmə klikləyin.", editModeBtn:"Çıxış", reorderModeText:"Sıralama rejimi aktivdir. Yeməkləri kateqoriya daxilində sürüşdürün.", reorderModeBtn:"Hazırdır", loadingSave:"Yadda saxlanılır...", loadingUpload:"Şəkil yüklənir...", loadingDelete:"Silinir...", loadingOrder:"Sıra yadda saxlanılır...", loadingLogin:"Daxil olunur...", loadingLogout:"Çıxış edilir...", toastGenericError:"Əməliyyatı tamamlamaq olmadı. Yenidən cəhd edin.", toastMenuLoadError:"Menyunu bazadan yükləmək olmadı.", toastCategoryRequired:"Kateqoriya ID-si və adı daxil edin.", toastItemRequired:"Yeməyin adını və düzgün qiymətini daxil edin.", toastPriceSaved:"Qiymət uğurla yadda saxlanıldı.", toastItemCreated:"Yemək uğurla əlavə olundu.", toastItemDeleted:"Yemək silindi.", toastCategoryCreated:"Kateqoriya yaradıldı.", toastCategoryDeleted:"Kateqoriya silindi.", toastOrderSaved:"Yeni sıra yadda saxlanıldı.", toastResetHint:"Cari məlumatları qorumaq üçün menyunun sıfırlanması SQL/ehtiyat nüsxə ilə saxlanılıb.", toastInvalidPrice:"Qiymət üçün yalnız rəqəm daxil edin.", toastReorderRequiresPosition:"Sıralama üçün items cədvəlinə position sütunu əlavə olunmalıdır.", toastReorderHint:"Yeməkləri ☰ işarəsindən tutub sürüşdürün.", toastImageTypeError:"Yalnız JPG, PNG və WEBP faylları dəstəklənir.", toastImageUrlError:"Şəklin açıq linkini almaq olmadı.", toastLoginSuccess:"Giriş uğurludur.", toastLogoutSuccess:"Admin panelindən çıxış edildi.", confirmDeleteCategory:"Kateqoriya və onun içindəki bütün yeməklər silinsin?", confirmDeleteItem:"Bu yemək silinsin?"
+                heroSubtitle:"Premium Lounge & Menyu", footer:"© 2026 CHILL BAR. Bütün hüquqlar qorunur.", admTitle:"İdarəetmə Paneli", admLabelEmail:"Email", admLabelPass:"Şifrə", admBtnLogin:"Daxil Ol", admBtnLogout:"Çıxış", admBlock1:"Menyu Bölmələri", admBtnCreateCat:"Kateqoriya Yarat", admLabelDelCat:"Kateqoriyanı sil:", admBtnDelCat:"Sil", admBlock2:"Yeni Mövqe Əlavə Et", admBtnPublish:"Dərc Et", admBlock3:"Mövqelərin Silinməsi", admBtnDelItem:"Sil", admLabelFastPrice:"Klik-Redaktor", admBtnClickEditor:"Aktivləşdir", admLabelReorder:"Sıralamanın dəyişdirilməsi", admBtnReorder:"Yeməklərin sırasını dəyiş", admLabelReset:"Sıfırlamaq", admBtnResetMenu:"Sıfırla", admLabelPhoto:"Yemək şəkli", admHintPhoto:"JPG, PNG və WEBP dəstəklənir. Fayl avtomatik Supabase Storage-a yüklənəcək.", placeholderId:"ID (ing, boşluqsuz)", placeholderName:"Adı", placeholderPrice:"Qiymət", placeholderDesc:"Təsviri", placeholderUrl:"Şəkil linki", emptyCat:"Bu kateqoriyada hələ heç bir mövqe yoxdur...", editModeText:"Qiymət redaktə rejimi aktivdir. Redaktə üçün rəqəmə klikləyin.", editModeBtn:"Çıxış", reorderModeText:"Sıralama rejimi aktivdir. Yeməkləri kateqoriya daxilində sürüşdürün.", reorderModeBtn:"Hazırdır", loadingSave:"Yadda saxlanılır...", loadingUpload:"Şəkil yüklənir...", loadingDelete:"Silinir...", loadingOrder:"Sıra yadda saxlanılır...", loadingLogin:"Daxil olunur...", loadingLogout:"Çıxış edilir...", toastGenericError:"Əməliyyatı tamamlamaq olmadı. Yenidən cəhd edin.", toastSaved:"Yadda saxlanıldı.", toastSaveNotConfirmed:"Supabase məlumatların saxlandığını təsdiqləmədi.", toastDeleteNotConfirmed:"Supabase məlumatların silindiyini təsdiqləmədi.", toastOrderNotConfirmed:"Supabase yeni yemək sırasını təsdiqləmədi.", toastRefreshAfterSaveError:"Məlumat saxlanıldı, amma menyunu Supabase-dən yenidən yükləmək olmadı.", toastPermissionDenied:"Məlumatı dəyişmək hüququ yoxdur. Admin girişini və RLS policies yoxlayın.", toastSaveError:"Yadda saxlama xətası.", toastMenuLoadError:"Menyunu bazadan yükləmək olmadı.", toastCategoryRequired:"Kateqoriya ID-si və adı daxil edin.", toastItemRequired:"Yeməyin adını və düzgün qiymətini daxil edin.", toastPriceSaved:"Qiymət uğurla yadda saxlanıldı.", toastItemCreated:"Yemək uğurla əlavə olundu.", toastItemDeleted:"Yemək silindi.", toastCategoryCreated:"Kateqoriya yaradıldı.", toastCategoryDeleted:"Kateqoriya silindi.", toastOrderSaved:"Yeni sıra yadda saxlanıldı.", toastResetHint:"Cari məlumatları qorumaq üçün menyunun sıfırlanması SQL/ehtiyat nüsxə ilə saxlanılıb.", toastInvalidPrice:"Qiymət üçün yalnız rəqəm daxil edin.", toastReorderRequiresPosition:"Sıralama üçün items cədvəlinə position sütunu əlavə olunmalıdır.", toastReorderHint:"Yeməkləri ☰ işarəsindən tutub sürüşdürün.", toastImageTypeError:"Yalnız JPG, PNG və WEBP faylları dəstəklənir.", toastImageUrlError:"Şəklin açıq linkini almaq olmadı.", toastLoginSuccess:"Giriş uğurludur.", toastLogoutSuccess:"Admin panelindən çıxış edildi.", confirmDeleteCategory:"Kateqoriya və onun içindəki bütün yeməklər silinsin?", confirmDeleteItem:"Bu yemək silinsin?"
             },
         },
     };
 
     async function initializeSupabase() {
         try {
-            console.log('Fetching config from /api/config...');
             const response = await fetch('/api/config');
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(`Failed to fetch server config: ${response.status} ${errorText}`);
             }
             const config = await response.json();
-            if (config.error || !config.supabaseUrl || !config.supabaseKey) {
+            const supabaseUrl = config.supabaseUrl || config.SUPABASE_URL;
+            const supabaseKey = config.supabaseKey || config.SUPABASE_ANON_KEY;
+            const storageBucket = config.storageBucket || config.supabaseStorageBucket || config.SUPABASE_STORAGE_BUCKET || App.config.storageBucket;
+            if (config.error || !supabaseUrl || !supabaseKey) {
                 throw new Error(`Invalid config from server: ${config.error || 'Missing keys'}`);
             }
-            console.log('Config received, initializing Supabase client...');
-            if (!window._supabaseClient) {
-                window._supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+            App.state.debugSupabase = ['localhost', '127.0.0.1', ''].includes(window.location.hostname)
+                || new URLSearchParams(window.location.search).get('debugSupabase') === '1';
+            App.state.supabaseConfig = {
+                url: supabaseUrl,
+                keyPreview: App.utils.maskKey(supabaseKey),
+                projectRef: App.utils.projectRefFromUrl(supabaseUrl),
+                storageBucket,
+            };
+            App.debug.log('config-loaded', {
+                url: App.state.supabaseConfig.url,
+                project: App.state.supabaseConfig.projectRef,
+                keyPreview: App.state.supabaseConfig.keyPreview,
+                storageBucket: App.state.supabaseConfig.storageBucket,
+            });
+            const existingConfig = window._supabaseClientConfig || {};
+            if (!window._supabaseClient || existingConfig.url !== supabaseUrl || existingConfig.key !== supabaseKey) {
+                App.debug.log('client-created', {
+                    previousProject: existingConfig.url ? App.utils.projectRefFromUrl(existingConfig.url) : null,
+                    nextProject: App.state.supabaseConfig.projectRef,
+                });
+                window._supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+                window._supabaseClientConfig = { url: supabaseUrl, key: supabaseKey };
             }
             db = window._supabaseClient;
             App.state.db = db;
-            App.state.supabaseConfig.storageBucket = config.storageBucket || config.supabaseStorageBucket || App.config.storageBucket;
             return true;
         } catch (error) {
             console.error('Supabase initialization failed:', error);
