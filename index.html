@@ -580,6 +580,39 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
   color: #F3C06B;
   margin-bottom: 8px;
 }
+.adm-lang-block {
+  padding: 0.65rem 0 0.7rem;
+  border-top: 1px solid rgba(243,192,107,0.12);
+}
+.adm-lang-block:first-of-type {
+  border-top: 0;
+  padding-top: 0.2rem;
+}
+.adm-lang-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.48rem;
+}
+.adm-lang-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(243,192,107,0.28);
+  background: rgba(243,192,107,0.08);
+  color: #F3C06B;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+.adm-lang-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(243,192,107,0.2), transparent);
+}
 .adm-field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1659,9 +1692,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   <div class="adm-section space-y-2">
     <p class="adm-section-title">${t.admBlock1}</p>
-    <div class="adm-field-grid">
-      <input type="text" id="new-cat-id" class="adm-input" placeholder="${t.placeholderId}" style="font-size:0.75rem">
-      <input type="text" id="new-cat-name" class="adm-input" placeholder="${t.placeholderName}" style="font-size:0.75rem">
+    <input type="text" id="new-cat-id" class="adm-input" placeholder="${t.placeholderId}" style="font-size:0.75rem">
+    <div class="adm-lang-block">
+      <div class="adm-lang-head"><span class="adm-lang-badge">RU</span><span class="adm-lang-line"></span></div>
+      <input type="text" id="new-cat-name-ru" class="adm-input" placeholder="Название категории (RU)" style="font-size:0.75rem">
+    </div>
+    <div class="adm-lang-block">
+      <div class="adm-lang-head"><span class="adm-lang-badge">EN</span><span class="adm-lang-line"></span></div>
+      <input type="text" id="new-cat-name-en" class="adm-input" placeholder="Category name (EN)" style="font-size:0.75rem">
+    </div>
+    <div class="adm-lang-block">
+      <div class="adm-lang-head"><span class="adm-lang-badge">AZ</span><span class="adm-lang-line"></span></div>
+      <input type="text" id="new-cat-name-az" class="adm-input" placeholder="Kateqoriya adı (AZ)" style="font-size:0.75rem">
     </div>
     <button id="create-cat-btn" class="btn-gold" style="font-size:0.72rem;padding:0.55rem">${t.admBtnCreateCat}</button>
     <label style="display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#ef4444;margin-top:6px">${t.admLabelDelCat}</label>
@@ -1673,12 +1715,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   <div class="adm-section space-y-2">
     <p class="adm-section-title">${t.admBlock2}</p>
-    <select id="add-item-cat-select" class="adm-input" style="font-size:0.75rem"></select>
+    <div class="adm-lang-block">
+      <div class="adm-lang-head"><span class="adm-lang-badge">RU</span><span class="adm-lang-line"></span></div>
+      <input type="text" id="add-item-name-ru" placeholder="Название (RU)" class="adm-input" style="font-size:0.75rem">
+      <input type="text" id="add-item-desc-ru" placeholder="Описание (RU)" class="adm-input" style="font-size:0.75rem;margin-top:8px">
+    </div>
+    <div class="adm-lang-block">
+      <div class="adm-lang-head"><span class="adm-lang-badge">EN</span><span class="adm-lang-line"></span></div>
+      <input type="text" id="add-item-name-en" placeholder="Name (EN)" class="adm-input" style="font-size:0.75rem">
+      <input type="text" id="add-item-desc-en" placeholder="Description (EN)" class="adm-input" style="font-size:0.75rem;margin-top:8px">
+    </div>
+    <div class="adm-lang-block">
+      <div class="adm-lang-head"><span class="adm-lang-badge">AZ</span><span class="adm-lang-line"></span></div>
+      <input type="text" id="add-item-name-az" placeholder="Ad (AZ)" class="adm-input" style="font-size:0.75rem">
+      <input type="text" id="add-item-desc-az" placeholder="Təsvir (AZ)" class="adm-input" style="font-size:0.75rem;margin-top:8px">
+    </div>
     <div class="adm-field-grid">
-      <input type="text" id="add-item-name" placeholder="${t.placeholderName}" class="adm-input" style="font-size:0.75rem">
+      <select id="add-item-cat-select" class="adm-input" style="font-size:0.75rem"></select>
       <input type="text" id="add-item-price" placeholder="${t.placeholderPrice}" class="adm-input" style="font-size:0.75rem">
     </div>
-    <input type="text" id="add-item-desc" placeholder="${t.placeholderDesc}" class="adm-input" style="font-size:0.75rem">
     <label style="display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(180,180,180,0.6);margin-top:4px">${t.admLabelPhoto}</label>
     <div class="adm-file-panel">
       <div id="add-item-image-preview" class="adm-file-preview">+</div>
@@ -1889,7 +1944,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             },
             clearItemForm() {
-                ['add-item-name', 'add-item-price', 'add-item-desc'].forEach(id => {
+                [
+                    'add-item-name-ru',
+                    'add-item-desc-ru',
+                    'add-item-name-en',
+                    'add-item-desc-en',
+                    'add-item-name-az',
+                    'add-item-desc-az',
+                    'add-item-price',
+                ].forEach(id => {
                     const element = App.dom.get(id);
                     if (element) element.value = '';
                 });
@@ -1925,8 +1988,10 @@ document.addEventListener('DOMContentLoaded', () => {
             async createCategory() {
                 const t = App.translations[App.state.currentLang];
                 const id = App.dom.get('new-cat-id').value.trim();
-                const name = App.dom.get('new-cat-name').value.trim();
-                if (!id || !name) {
+                const nameRu = App.dom.get('new-cat-name-ru').value.trim();
+                const nameEn = App.dom.get('new-cat-name-en').value.trim() || nameRu;
+                const nameAz = App.dom.get('new-cat-name-az').value.trim() || nameRu;
+                if (!id || !nameRu) {
                     App.ui.info(t.toastCategoryRequired);
                     return;
                 }
@@ -1937,7 +2002,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     mutation: true,
                 }, async () => {
                     await App.data.requireAuthForMutation();
-                    const payload = { id, name_ru: name, name_en: name, name_az: name };
+                    const payload = { id, name_ru: nameRu, name_en: nameEn, name_az: nameAz };
                     const inserted = await App.data.execute(
                         'categories',
                         'insert',
@@ -1948,7 +2013,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const saved = await App.data.fetchCategoryById(id);
                     App.data.ensureSavedRecord(saved, t.toastSaveNotConfirmed);
                     App.dom.get('new-cat-id').value = '';
-                    App.dom.get('new-cat-name').value = '';
+                    App.dom.get('new-cat-name-ru').value = '';
+                    App.dom.get('new-cat-name-en').value = '';
+                    App.dom.get('new-cat-name-az').value = '';
                     await App.admin.syncAfterMutation(t.toastCategoryCreated);
                 });
             },
@@ -1990,11 +2057,15 @@ document.addEventListener('DOMContentLoaded', () => {
             async createItem() {
                 const t = App.translations[App.state.currentLang];
                 const catId = App.dom.get('add-item-cat-select').value;
-                const name  = App.dom.get('add-item-name').value.trim();
+                const nameRu = App.dom.get('add-item-name-ru').value.trim();
+                const nameEn = App.dom.get('add-item-name-en').value.trim() || nameRu;
+                const nameAz = App.dom.get('add-item-name-az').value.trim() || nameRu;
                 const price = App.utils.parsePriceInput(App.dom.get('add-item-price').value.trim());
-                const desc  = App.dom.get('add-item-desc').value.trim();
+                const descRu = App.dom.get('add-item-desc-ru').value.trim();
+                const descEn = App.dom.get('add-item-desc-en').value.trim() || descRu;
+                const descAz = App.dom.get('add-item-desc-az').value.trim() || descRu;
                 const imageFile = App.dom.get('add-item-image').files[0];
-                if (!catId || !name || Number.isNaN(price)) {
+                if (!catId || !nameRu || Number.isNaN(price)) {
                     App.ui.info(t.toastItemRequired);
                     return;
                 }
@@ -2007,9 +2078,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     await App.data.requireAuthForMutation();
                     const payload = {
                         category_id: catId,
-                        name_ru: name, name_en: name, name_az: name,
+                        name_ru: nameRu,
+                        name_en: nameEn,
+                        name_az: nameAz,
                         price,
-                        desc_ru: desc, desc_en: desc, desc_az: desc,
+                        desc_ru: descRu,
+                        desc_en: descEn,
+                        desc_az: descAz,
                         img_url: '',
                     };
                     if (imageFile) {
