@@ -985,7 +985,7 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
     <!-- Footer -->
     <footer class="mt-24 text-center space-y-4 pb-8">
         <p id="footer-text" class="text-xs tracking-widest uppercase footer-text" style="color:rgba(180,160,120,0.3)"></p>
-        <button onclick="app.auth.openAdminModal()" id="admin-panel-btn"
+        <button onclick="app.auth.openAdminModal()" id="admin-panel-btn" hidden aria-hidden="true" tabindex="-1"
             style="font-size:10px;color:rgba(180,160,120,0.3);border:1px solid rgba(180,160,120,0.1);padding:4px 12px;border-radius:6px;background:transparent;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.2s"
             onmouseover="this.style.color='#F3C06B';this.style.borderColor='rgba(243,192,107,0.3)'"
             onmouseout="this.style.color='rgba(180,160,120,0.3)';this.style.borderColor='rgba(180,160,120,0.1)'">Admin Panel</button>
@@ -1033,6 +1033,8 @@ document.addEventListener('DOMContentLoaded', () => {
             defaultLang: 'ru',
             scrollOffset: -80,
             storageBucket: 'menu-images',
+            adminUrlParam: 'admin',
+            adminUrlHash: 'admin',
         },
         state: {
             currentLang: 'ru',
@@ -1047,6 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sortables: [],
             pendingActions: new Set(),
             loadingCount: 0,
+            isAdminUrlAccess: false,
         },
 
         dom: {
@@ -1436,6 +1439,30 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         auth: {
+            hasAdminUrlAccess() {
+                const params = new URLSearchParams(window.location.search);
+                const adminParam = params.get(App.config.adminUrlParam);
+                const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+                const hasValidParam = params.has(App.config.adminUrlParam)
+                    && (!adminParam || ['1', 'true', 'yes', 'open'].includes(adminParam.toLowerCase()));
+                return hasValidParam || hash === App.config.adminUrlHash;
+            },
+            syncAdminAccessFromUrl({ autoOpen = false } = {}) {
+                const hasAccess = App.auth.hasAdminUrlAccess();
+                App.state.isAdminUrlAccess = hasAccess;
+                const button = App.dom.get('admin-panel-btn');
+                if (button) {
+                    button.hidden = !hasAccess;
+                    button.setAttribute('aria-hidden', String(!hasAccess));
+                    button.tabIndex = hasAccess ? 0 : -1;
+                }
+                if (!hasAccess) {
+                    App.auth.closeAdminModal();
+                    return false;
+                }
+                if (autoOpen) App.auth.openAdminModal();
+                return true;
+            },
             async signIn() {
                 const t = App.translations[App.state.currentLang];
                 const email = App.dom.get('admin-email').value;
@@ -1478,6 +1505,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             openAdminModal() {
+                if (!App.auth.hasAdminUrlAccess()) {
+                    App.auth.syncAdminAccessFromUrl();
+                    return;
+                }
                 const modal = App.dom.get('admin-modal');
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
@@ -2352,7 +2383,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // в т.ч. при загрузке страницы — теперь только при SIGNED_IN
                 App.state.db.auth.onAuthStateChange((_event, session) => {
                     App.state.currentUser = session?.user || null;
-                    if (_event === 'SIGNED_IN') App.auth.openAdminModal();
+                    if (_event === 'SIGNED_IN' && App.auth.hasAdminUrlAccess()) App.auth.openAdminModal();
                     if (_event === 'SIGNED_OUT') App.auth.closeAdminModal();
                 });
 
@@ -2362,6 +2393,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await App.data.detectPositionColumn();
                 App.init.events();
                 await App.render.fullPage();
+                App.auth.syncAdminAccessFromUrl({ autoOpen: true });
             },
             animations() {
                 App.dom.queryAll('a[href^="#"]').forEach(a => a.addEventListener('click', function(e) {
@@ -2382,6 +2414,8 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             events() {
                 App.dom.get('admin-password').addEventListener('keydown', e => e.key === 'Enter' && App.auth.signIn());
+                window.addEventListener('hashchange', () => App.auth.syncAdminAccessFromUrl({ autoOpen: true }));
+                window.addEventListener('popstate', () => App.auth.syncAdminAccessFromUrl({ autoOpen: true }));
             },
         },
 
