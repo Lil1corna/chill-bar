@@ -908,31 +908,167 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
 }
 .sortable-chosen { box-shadow: 0 0 22px rgba(243,192,107,0.18); }
 @media (max-width: 640px) {
+  .top-control-left,
+  .top-controls-right {
+    transition: transform 0.24s ease, opacity 0.2s ease;
+    will-change: transform, opacity;
+  }
+  .top-control-left {
+    top: 0.75rem !important;
+    left: 0.75rem !important;
+  }
   .top-controls-right {
     top: 0.75rem !important;
     right: 0.75rem !important;
     display: grid;
     justify-items: end;
-    gap: 0.45rem;
+    gap: 0.38rem;
+  }
+  body.mobile-ui-hidden .top-control-left,
+  body.mobile-ui-hidden .top-controls-right {
+    opacity: 0;
+    transform: translateY(-16px);
+    pointer-events: none;
+  }
+  .ctrl-pill {
+    padding: 0.5rem;
+    border-radius: 0.78rem;
   }
   .phone-pill {
-    padding: 0.42rem 0.56rem;
-    font-size: 0.64rem;
-    letter-spacing: 0.035em;
+    padding: 0.38rem 0.52rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
   }
   .phone-pill-icon { display: none; }
+  .lang-wrap {
+    padding: 3px;
+    border-radius: 0.78rem;
+  }
+  .lang-btn {
+    padding: 3px 7px;
+    font-size: 0.62rem;
+  }
+  .nav-wrap {
+    top: 4.45rem;
+    padding: 0.55rem 0.75rem;
+    transition: top 0.24s ease, padding 0.2s ease;
+    scroll-padding-left: 0.75rem;
+  }
+  body.mobile-ui-hidden .nav-wrap { top: 0; }
+  .nav-pill {
+    padding: 6px 13px;
+    font-size: 0.62rem;
+    letter-spacing: 0.07em;
+  }
+  #nav-container {
+    gap: 0.4rem !important;
+  }
+  #menu-sections {
+    margin-top: 1.5rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  #menu-sections > * + * {
+    margin-top: 2.75rem !important;
+  }
+  #menu-sections > section {
+    scroll-margin-top: 7.5rem;
+  }
+  #menu-sections > section > div:first-child {
+    margin-bottom: 0.85rem !important;
+  }
+  body.mobile-ui-hidden #menu-sections > section {
+    scroll-margin-top: 3.5rem;
+  }
+  .cat-title {
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+  }
+  .menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .menu-card {
+    min-width: 0;
+    border-radius: 0.88rem;
+    padding: 0.68rem;
+    align-items: stretch;
+    gap: 0.55rem;
+  }
+  .menu-card:not(.menu-card-photo) {
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 116px;
+  }
+  .menu-card:not(.menu-card-photo) > div:first-child {
+    padding-right: 0 !important;
+  }
   .menu-card-photo {
-    min-height: 286px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 0.9rem;
   }
   .menu-photo {
-    height: 178px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+  .menu-photo-img,
+  .menu-photo-backdrop {
+    object-fit: cover;
+  }
+  .menu-photo-img {
+    padding: 0;
+  }
+  .menu-photo-backdrop {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: scale(1.02);
   }
   .menu-card-body {
-    padding: 0.95rem 0.95rem 1rem;
-    gap: 0.75rem;
+    padding: 0.7rem 0.72rem 0.78rem;
+    gap: 0.48rem;
   }
+  .menu-card-body::before {
+    left: 0.72rem;
+    right: 0.72rem;
+  }
+  .item-name,
+  .menu-card-photo .item-name {
+    font-size: 0.72rem;
+    line-height: 1.18;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .item-desc,
+  .menu-card-photo .item-desc {
+    font-size: 0.61rem;
+    line-height: 1.25;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .price-tag,
   .menu-card-photo .price-tag {
-    font-size: 1.62rem;
+    font-size: 1.05rem;
+    line-height: 1;
+  }
+  .price-tag .unit,
+  .menu-card-photo .price-tag .unit {
+    font-size: 0.55rem;
+  }
+  .menu-card-price-row {
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .menu-card-price-row::before {
+    margin-bottom: 0.18rem;
   }
   .modal-overlay {
     align-items: flex-end;
@@ -981,7 +1117,7 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
     </div>
 
     <!-- Theme Toggle (top-left) -->
-    <div style="position:fixed;top:1rem;left:1rem;z-index:60">
+    <div class="top-control-left" style="position:fixed;top:1rem;left:1rem;z-index:60">
         <button id="theme-toggle-btn" onclick="app.toggleTheme()" class="ctrl-pill" title="Сменить тему">
             <svg id="icon-moon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
@@ -1092,6 +1228,8 @@ document.addEventListener('DOMContentLoaded', () => {
             pendingActions: new Set(),
             loadingCount: 0,
             isAdminUrlAccess: false,
+            lastMobileScrollY: 0,
+            mobileScrollTicking: false,
             photoManagerSelectedId: '',
             photoManagerFile: null,
         },
@@ -1741,7 +1879,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 App.admin.activateTextEditor(categoryTitle, App.admin.updateCategoryName);
                             }
                             const itemsGrid = document.createElement('div');
-                            itemsGrid.className = 'grid sm:grid-cols-2 gap-4';
+                            itemsGrid.className = 'menu-grid grid sm:grid-cols-2 gap-4';
                             itemsGrid.dataset.categoryId = cat.id;
                             itemsGrid.dataset.categoryGrid = 'true';
                             const categoryItems = items.filter(i => i.catId === cat.id);
@@ -2109,6 +2247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     App.ui.info(App.translations[App.state.currentLang].toastImageValidationError);
                     return;
                 }
+                App.state.photoManagerFile = file;
                 const previewUrl = URL.createObjectURL(file);
                 preview.innerHTML = `<img src="${previewUrl}" alt="">`;
                 const image = preview.querySelector('img');
@@ -2592,6 +2731,37 @@ document.addEventListener('DOMContentLoaded', () => {
             App.admin.syncModeBar();
         },
 
+        mobileUi: {
+            isMobile() {
+                return window.matchMedia('(max-width: 640px)').matches;
+            },
+            update() {
+                const currentY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+                const lastY = App.state.lastMobileScrollY || 0;
+                const isDown = currentY > lastY;
+                if (!App.mobileUi.isMobile() || currentY < 20) {
+                    document.body.classList.remove('mobile-ui-hidden');
+                } else if (isDown && currentY > 40) {
+                    document.body.classList.add('mobile-ui-hidden');
+                } else if (!isDown) {
+                    document.body.classList.remove('mobile-ui-hidden');
+                }
+                App.state.lastMobileScrollY = currentY;
+                App.state.mobileScrollTicking = false;
+            },
+            onScroll() {
+                if (App.state.mobileScrollTicking) return;
+                App.state.mobileScrollTicking = true;
+                requestAnimationFrame(App.mobileUi.update);
+            },
+            onResize() {
+                if (!App.mobileUi.isMobile()) {
+                    document.body.classList.remove('mobile-ui-hidden');
+                }
+                App.state.lastMobileScrollY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+            },
+        },
+
         init: {
             async once() {
                 const phoneLink = App.dom.get('contact-phone-link');
@@ -2651,6 +2821,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 App.dom.get('admin-password').addEventListener('keydown', e => e.key === 'Enter' && App.auth.signIn());
                 window.addEventListener('hashchange', () => App.auth.syncAdminAccessFromUrl({ autoOpen: true }));
                 window.addEventListener('popstate', () => App.auth.syncAdminAccessFromUrl({ autoOpen: true }));
+                App.state.lastMobileScrollY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+                window.addEventListener('scroll', App.mobileUi.onScroll, { passive: true });
+                window.addEventListener('resize', App.mobileUi.onResize);
             },
         },
 
