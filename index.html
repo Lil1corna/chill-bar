@@ -343,10 +343,13 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
 .menu-photo,
 .menu-photo-frame {
   position: relative;
+  display: grid;
+  place-items: center;
   width: 100%;
   height: clamp(168px, 22vw, 218px);
   border-radius: 0.9rem;
   overflow: hidden;
+  padding: 0.7rem;
   background: var(--menu-photo-bg);
 }
 .menu-photo::after {
@@ -387,13 +390,14 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
 .menu-photo-img {
   position: relative;
   z-index: 2;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   display: block;
   object-fit: contain;
   object-position: center;
-  border-radius: inherit;
-  padding: 0.7rem;
+  border-radius: 0.65rem;
   transform: scale(1);
   filter: saturate(0.96) contrast(1.04);
   transition: filter 0.45s ease;
@@ -1020,6 +1024,7 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
   .menu-photo-frame {
     height: auto;
     aspect-ratio: 1 / 1;
+    padding: 0.35rem;
   }
   .menu-photo-backdrop {
     object-fit: cover;
@@ -1028,7 +1033,7 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
   .menu-photo-img {
     object-fit: contain;
     object-position: center;
-    padding: 0.35rem;
+    border-radius: 0.55rem;
   }
   .menu-photo-backdrop {
     inset: 0;
@@ -2257,7 +2262,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     App.ui.info(App.translations[App.state.currentLang].toastImageValidationError);
                     return;
                 }
-                App.state.photoManagerFile = file;
                 const previewUrl = URL.createObjectURL(file);
                 preview.innerHTML = `<img src="${previewUrl}" alt="">`;
                 const image = preview.querySelector('img');
