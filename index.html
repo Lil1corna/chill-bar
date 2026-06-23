@@ -37,7 +37,7 @@
   --menu-card-photo-border: rgba(243,192,107,0.11);
   --menu-photo-bg: radial-gradient(circle at 50% 35%, rgba(243,192,107,0.13), transparent 44%), linear-gradient(135deg, rgba(255,255,255,0.08), rgba(243,192,107,0.035)), #080a10;
   --menu-photo-overlay: linear-gradient(to bottom, rgba(4,6,10,0.08) 0%, rgba(6,8,14,0.24) 56%, rgba(6,8,14,0.62) 100%), radial-gradient(circle at 18% 15%, rgba(243,192,107,0.13), transparent 34%);
-  --menu-photo-backdrop-opacity: 0.26;
+  --menu-photo-backdrop-opacity: 0.62;
   --menu-photo-backdrop-filter: blur(20px) saturate(0.8) brightness(0.72);
   --menu-card-panel-bg: linear-gradient(180deg, rgba(7,10,18,0.92), rgba(5,7,12,0.98)), rgba(10,10,10,0.96);
   --menu-card-panel-border: rgba(243,192,107,0.13);
@@ -84,7 +84,7 @@ body.light {
   --menu-card-photo-border: rgba(170,120,24,0.22);
   --menu-photo-bg: radial-gradient(circle at 50% 36%, rgba(243,192,107,0.16), transparent 46%), linear-gradient(135deg, rgba(255,255,255,0.98), rgba(243,192,107,0.08)), #f7f4ed;
   --menu-photo-overlay: linear-gradient(to bottom, rgba(255,255,255,0.02) 0%, rgba(250,248,243,0.16) 60%, rgba(250,248,243,0.4) 100%), radial-gradient(circle at 18% 15%, rgba(243,192,107,0.16), transparent 34%);
-  --menu-photo-backdrop-opacity: 0.16;
+  --menu-photo-backdrop-opacity: 0.34;
   --menu-photo-backdrop-filter: blur(22px) saturate(0.72) brightness(1.24) contrast(0.86);
   --menu-card-panel-bg: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,248,243,0.96)), rgba(255,255,255,0.96);
   --menu-card-panel-border: rgba(170,120,24,0.18);
@@ -106,6 +106,7 @@ body.light .menu-card:hover { border-color: rgba(243,192,107,0.5); }
 body.light .ctrl-pill { background: rgba(255,255,255,0.95); border-color: rgba(243,192,107,0.3); }
 body.light .ctrl-pill svg { color: #a07820; }
 body.light .lang-wrap { background: rgba(255,255,255,0.95); border-color: rgba(243,192,107,0.3); }
+body.light .phone-pill { background: rgba(255,255,255,0.95); border-color: rgba(243,192,107,0.3); color: #8a6414; }
 body.light .lang-btn { color: rgba(140,100,20,0.5); }
 body.light .adm-input { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #1a1a1a; }
 body.light .modal-box { background: rgba(250,248,243,0.99); }
@@ -239,6 +240,29 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
 }
 .lang-btn.on { background: #F3C06B; color: #0a0a0a; }
 .lang-btn:not(.on):hover { color: rgba(243,192,107,0.75); }
+.phone-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(14,12,24,0.88);
+  border: 1px solid rgba(243,192,107,0.22);
+  border-radius: 0.875rem;
+  padding: 0.48rem 0.72rem;
+  color: #F3C06B;
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.phone-pill:hover {
+  border-color: rgba(243,192,107,0.55);
+  box-shadow: 0 0 12px rgba(243,192,107,0.2);
+  transform: translateY(-1px);
+}
+.phone-pill-icon { font-size: 0.82rem; line-height: 1; }
 
 /* ─── NAV ──────────────────────────────────────────── */
 .nav-wrap {
@@ -316,8 +340,10 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   background: var(--menu-card-photo-bg);
   border-color: var(--menu-card-photo-border);
 }
-.menu-photo {
+.menu-photo,
+.menu-photo-frame {
   position: relative;
+  width: 100%;
   height: clamp(168px, 22vw, 218px);
   overflow: hidden;
   background: var(--menu-photo-bg);
@@ -349,11 +375,13 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   width: calc(100% + 36px);
   height: calc(100% + 36px);
   object-fit: cover;
+  object-position: center;
   opacity: var(--menu-photo-backdrop-opacity);
   filter: var(--menu-photo-backdrop-filter);
   transform: scale(1.06);
   transition: opacity 0.28s ease, filter 0.28s ease;
 }
+.menu-photo-main,
 .menu-photo-img {
   position: relative;
   z-index: 2;
@@ -361,6 +389,7 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   height: 100%;
   display: block;
   object-fit: contain;
+  object-position: center;
   padding: 0.7rem;
   transform: scale(1);
   filter: saturate(0.96) contrast(1.04);
@@ -884,18 +913,170 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
 }
 .sortable-chosen { box-shadow: 0 0 22px rgba(243,192,107,0.18); }
 @media (max-width: 640px) {
-  .menu-card-photo {
-    min-height: 286px;
+  .top-control-left,
+  .top-controls-right {
+    transition: transform 0.24s ease, opacity 0.2s ease;
+    will-change: transform, opacity;
   }
-  .menu-photo {
-    height: 178px;
+  .top-control-left {
+    top: 0.75rem !important;
+    left: 0.75rem !important;
+  }
+  .top-controls-right {
+    top: 0.75rem !important;
+    right: 0.75rem !important;
+    display: grid;
+    justify-items: end;
+    gap: 0.38rem;
+  }
+  body.mobile-ui-hidden .top-control-left,
+  body.mobile-ui-hidden .top-controls-right {
+    opacity: 0;
+    transform: translateY(-16px);
+    pointer-events: none;
+  }
+  .ctrl-pill {
+    padding: 0.5rem;
+    border-radius: 0.78rem;
+  }
+  .phone-pill {
+    padding: 0.38rem 0.52rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
+  }
+  .phone-pill-icon { display: none; }
+  .lang-wrap {
+    padding: 3px;
+    border-radius: 0.78rem;
+  }
+  .lang-btn {
+    padding: 3px 7px;
+    font-size: 0.62rem;
+  }
+  .nav-wrap {
+    top: 4.45rem;
+    padding: 0.55rem 0.75rem;
+    transition: top 0.24s ease, padding 0.2s ease;
+    scroll-padding-left: 0.75rem;
+  }
+  body.mobile-ui-hidden .nav-wrap { top: 0; }
+  .nav-pill {
+    padding: 6px 13px;
+    font-size: 0.62rem;
+    letter-spacing: 0.07em;
+  }
+  #nav-container {
+    gap: 0.4rem !important;
+  }
+  #menu-sections {
+    margin-top: 1.5rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  #menu-sections > * + * {
+    margin-top: 2.75rem !important;
+  }
+  #menu-sections > section {
+    scroll-margin-top: 7.5rem;
+  }
+  #menu-sections > section > div:first-child {
+    margin-bottom: 0.85rem !important;
+  }
+  body.mobile-ui-hidden #menu-sections > section {
+    scroll-margin-top: 3.5rem;
+  }
+  .cat-title {
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+  }
+  .menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .menu-card {
+    min-width: 0;
+    border-radius: 0.88rem;
+    padding: 0.68rem;
+    align-items: stretch;
+    gap: 0.55rem;
+  }
+  .menu-card:not(.menu-card-photo) {
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 116px;
+  }
+  .menu-card:not(.menu-card-photo) > div:first-child {
+    padding-right: 0 !important;
+  }
+  .menu-card-photo {
+    min-height: 0;
+    padding: 0;
+    border-radius: 0.9rem;
+  }
+  .menu-photo,
+  .menu-photo-frame {
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+  .menu-photo-backdrop {
+    object-fit: cover;
+  }
+  .menu-photo-main,
+  .menu-photo-img {
+    object-fit: contain;
+    object-position: center;
+    padding: 0.35rem;
+  }
+  .menu-photo-backdrop {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: scale(1.02);
   }
   .menu-card-body {
-    padding: 0.95rem 0.95rem 1rem;
-    gap: 0.75rem;
+    padding: 0.7rem 0.72rem 0.78rem;
+    gap: 0.48rem;
   }
+  .menu-card-body::before {
+    left: 0.72rem;
+    right: 0.72rem;
+  }
+  .item-name,
+  .menu-card-photo .item-name {
+    font-size: 0.72rem;
+    line-height: 1.18;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .item-desc,
+  .menu-card-photo .item-desc {
+    font-size: 0.61rem;
+    line-height: 1.25;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .price-tag,
   .menu-card-photo .price-tag {
-    font-size: 1.62rem;
+    font-size: 1.05rem;
+    line-height: 1;
+  }
+  .price-tag .unit,
+  .menu-card-photo .price-tag .unit {
+    font-size: 0.55rem;
+  }
+  .menu-card-price-row {
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .menu-card-price-row::before {
+    margin-bottom: 0.18rem;
   }
   .modal-overlay {
     align-items: flex-end;
@@ -944,7 +1125,7 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
     </div>
 
     <!-- Theme Toggle (top-left) -->
-    <div style="position:fixed;top:1rem;left:1rem;z-index:60">
+    <div class="top-control-left" style="position:fixed;top:1rem;left:1rem;z-index:60">
         <button id="theme-toggle-btn" onclick="app.toggleTheme()" class="ctrl-pill" title="Сменить тему">
             <svg id="icon-moon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
@@ -955,8 +1136,12 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
         </button>
     </div>
 
-    <!-- Language Switcher (top-right) — FIX: этих кнопок вообще не было в HTML -->
-    <div style="position:fixed;top:1rem;right:1rem;z-index:60">
+    <!-- Contact + Language Switcher (top-right) -->
+    <div class="top-controls-right" style="position:fixed;top:1rem;right:1rem;z-index:60;display:flex;align-items:center;gap:0.55rem">
+        <a id="contact-phone-link" class="phone-pill" href="tel:+994552444425" aria-label="Call Chill Bar">
+            <span class="phone-pill-icon">☎</span>
+            <span id="contact-phone-text">+994 55 244 44 25</span>
+        </a>
         <div class="lang-wrap">
             <button id="btn-ru" class="lang-btn on" onclick="app.changeLanguage('ru')">RU</button>
             <button id="btn-en" class="lang-btn" onclick="app.changeLanguage('en')">EN</button>
@@ -1035,6 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
             storageBucket: 'menu-images',
             adminUrlParam: 'admin',
             adminUrlHash: 'admin',
+            contactPhone: '+994 55 244 44 25',
         },
         state: {
             currentLang: 'ru',
@@ -1050,6 +1236,9 @@ document.addEventListener('DOMContentLoaded', () => {
             pendingActions: new Set(),
             loadingCount: 0,
             isAdminUrlAccess: false,
+            mobileScrollTicking: false,
+            photoManagerSelectedId: '',
+            photoManagerFile: null,
         },
 
         dom: {
@@ -1112,9 +1301,25 @@ document.addEventListener('DOMContentLoaded', () => {
             isSupportedImage(file) {
                 if (!file) return false;
                 const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                const maxSize = 5 * 1024 * 1024;
+                if (file.size > maxSize) return false;
                 const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
                 const extension = String(file.name || '').split('.').pop().toLowerCase();
                 return allowedTypes.includes(file.type) || allowedExtensions.includes(extension);
+            },
+
+            storagePathFromPublicUrl(publicUrl) {
+                if (!publicUrl) return '';
+                const bucket = App.state.supabaseConfig.storageBucket || App.config.storageBucket;
+                try {
+                    const url = new URL(publicUrl);
+                    const marker = `/storage/v1/object/public/${bucket}/`;
+                    const index = url.pathname.indexOf(marker);
+                    if (index === -1) return '';
+                    return decodeURIComponent(url.pathname.slice(index + marker.length));
+                } catch (_error) {
+                    return '';
+                }
             },
             buildStoragePath(file) {
                 const extension = String(file.name || 'jpg').split('.').pop().toLowerCase() || 'jpg';
@@ -1411,11 +1616,21 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         storage: {
+            async removeItemImage(publicUrl) {
+                const filePath = App.utils.storagePathFromPublicUrl(publicUrl);
+                if (!filePath) return false;
+                const bucket = App.state.supabaseConfig.storageBucket || App.config.storageBucket;
+                App.debug.request('storage.objects', 'remove', { bucket, filePath }, { status: 'request' });
+                const { data, error } = await App.state.db.storage.from(bucket).remove([filePath]);
+                App.debug.request('storage.objects', 'remove', { bucket, filePath }, { data, error });
+                if (error) throw error;
+                return true;
+            },
             async uploadItemImage(file) {
                 const t = App.translations[App.state.currentLang];
                 if (!file) return '';
                 if (!App.utils.isSupportedImage(file)) {
-                    throw new Error(t.toastImageTypeError);
+                    throw new Error(t.toastImageValidationError || t.toastImageTypeError);
                 }
                 const bucket = App.state.supabaseConfig.storageBucket || App.config.storageBucket;
                 const filePath = App.utils.buildStoragePath(file);
@@ -1577,10 +1792,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (hasPhoto) {
                     card.innerHTML = `
-                        <div class="menu-photo">
+                        <div class="menu-photo menu-photo-frame">
                             ${dragHandle}
                             <img src="${u.sanitize(item.img)}" loading="lazy" class="menu-photo-backdrop" alt="" aria-hidden="true">
-                            <img src="${u.sanitize(item.img)}" loading="lazy" class="menu-photo-img" alt="${u.sanitize(item.name)}">
+                            <img src="${u.sanitize(item.img)}" loading="lazy" class="menu-photo-main menu-photo-img" alt="${u.sanitize(item.name)}">
                         </div>
                         <div class="menu-card-body">
                             <div style="min-width:0">
@@ -1671,7 +1886,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 App.admin.activateTextEditor(categoryTitle, App.admin.updateCategoryName);
                             }
                             const itemsGrid = document.createElement('div');
-                            itemsGrid.className = 'grid sm:grid-cols-2 gap-4';
+                            itemsGrid.className = 'menu-grid grid sm:grid-cols-2 gap-4';
                             itemsGrid.dataset.categoryId = cat.id;
                             itemsGrid.dataset.categoryGrid = 'true';
                             const categoryItems = items.filter(i => i.catId === cat.id);
@@ -1776,6 +1991,28 @@ document.addEventListener('DOMContentLoaded', () => {
     <button id="add-item-btn" class="btn-green">${t.admBtnPublish}</button>
   </div>
 
+  <div class="adm-section space-y-2">
+    <p class="adm-section-title">${t.admBlockPhotoManager}</p>
+    <select id="photo-item-select" class="adm-input" style="font-size:0.75rem"></select>
+    <div class="adm-file-panel">
+      <div id="photo-current-preview" class="adm-file-preview">—</div>
+      <div style="min-width:0">
+        <p id="photo-current-label" style="font-size:0.66rem;color:rgba(230,220,200,0.58);line-height:1.35">${t.admNoPhoto}</p>
+      </div>
+    </div>
+    <div class="adm-file-panel">
+      <div id="photo-new-preview" class="adm-file-preview">+</div>
+      <div style="min-width:0">
+        <input type="file" id="photo-manager-file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="adm-input" style="font-size:0.75rem;padding:0.55rem 0.75rem">
+        <p style="font-size:0.64rem;color:rgba(180,180,180,0.48);margin-top:6px;line-height:1.35">${t.admHintPhoto}</p>
+      </div>
+    </div>
+    <div class="adm-action-grid">
+      <button id="save-photo-btn" class="btn-green">${t.admBtnSavePhoto}</button>
+      <button id="delete-photo-btn" class="btn-red" style="width:100%;padding:0.72rem">${t.admBtnDeletePhoto}</button>
+    </div>
+  </div>
+
   <div class="adm-section adm-danger-zone space-y-2">
     <p class="adm-section-title">${t.admBlock3}</p>
     <select id="delete-item-select" class="adm-input" style="font-size:0.75rem"></select>
@@ -1813,6 +2050,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 App.dom.get('delete-category-select').innerHTML = catOpts;
                 App.dom.get('add-item-cat-select').innerHTML = catOpts;
                 App.dom.get('delete-item-select').innerHTML = itemOpts;
+                App.dom.get('photo-item-select').innerHTML = itemOpts;
 
                 // Wire up buttons
                 App.dom.get('logout-btn').onclick       = App.auth.signOut;
@@ -1824,6 +2062,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 App.dom.get('reorder-btn').onclick      = App.admin.enableReordering;
                 App.dom.get('reset-menu-btn').onclick   = App.admin.resetMenu; // FIX: раньше id не совпадал
                 App.dom.get('add-item-image').onchange  = App.admin.updateItemImagePreview;
+                App.dom.get('photo-item-select').onchange = App.admin.renderPhotoManager;
+                App.dom.get('photo-manager-file').onchange = App.admin.updatePhotoManagerPreview;
+                App.dom.get('save-photo-btn').onclick = App.admin.saveManagedPhoto;
+                App.dom.get('delete-photo-btn').onclick = App.admin.deleteManagedPhoto;
+                App.admin.renderPhotoManager();
             },
             syncModeBar() {
                 const t = App.translations[App.state.currentLang];
@@ -2008,13 +2251,133 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!App.utils.isSupportedImage(file)) {
                     event.target.value = '';
                     App.admin.resetItemImagePreview();
-                    App.ui.info(App.translations[App.state.currentLang].toastImageTypeError);
+                    App.ui.info(App.translations[App.state.currentLang].toastImageValidationError);
                     return;
                 }
                 const previewUrl = URL.createObjectURL(file);
                 preview.innerHTML = `<img src="${previewUrl}" alt="">`;
                 const image = preview.querySelector('img');
                 if (image) image.onload = () => URL.revokeObjectURL(previewUrl);
+            },
+            getSelectedPhotoItem() {
+                const itemId = App.dom.get('photo-item-select')?.value;
+                return (App.state.menuData.items[App.state.currentLang] || []).find(item => String(item.id) === String(itemId)) || null;
+            },
+            renderPhotoManager() {
+                const item = App.admin.getSelectedPhotoItem();
+                const currentPreview = App.dom.get('photo-current-preview');
+                const currentLabel = App.dom.get('photo-current-label');
+                const deleteButton = App.dom.get('delete-photo-btn');
+                if (!currentPreview || !currentLabel) return;
+                App.state.photoManagerSelectedId = item?.id || '';
+                App.state.photoManagerFile = null;
+                const fileInput = App.dom.get('photo-manager-file');
+                if (fileInput) fileInput.value = '';
+                const newPreview = App.dom.get('photo-new-preview');
+                if (newPreview) newPreview.innerHTML = '+';
+                if (item?.img) {
+                    currentPreview.innerHTML = `<img src="${App.utils.sanitize(item.img)}" alt="${App.utils.sanitize(item.name)}">`;
+                    currentLabel.textContent = App.translations[App.state.currentLang].admCurrentPhoto;
+                    if (deleteButton) deleteButton.disabled = false;
+                } else {
+                    currentPreview.innerHTML = '—';
+                    currentLabel.textContent = App.translations[App.state.currentLang].admNoPhoto;
+                    if (deleteButton) deleteButton.disabled = true;
+                }
+            },
+            updatePhotoManagerPreview(event) {
+                const t = App.translations[App.state.currentLang];
+                const preview = App.dom.get('photo-new-preview');
+                const file = event.target.files?.[0] || null;
+                App.state.photoManagerFile = null;
+                if (!preview) return;
+                if (!file) {
+                    preview.innerHTML = '+';
+                    return;
+                }
+                if (!App.utils.isSupportedImage(file)) {
+                    event.target.value = '';
+                    preview.innerHTML = '+';
+                    App.ui.info(t.toastImageValidationError);
+                    return;
+                }
+                App.state.photoManagerFile = file;
+                const previewUrl = URL.createObjectURL(file);
+                preview.innerHTML = `<img src="${previewUrl}" alt="">`;
+                const image = preview.querySelector('img');
+                if (image) image.onload = () => URL.revokeObjectURL(previewUrl);
+            },
+            async saveManagedPhoto() {
+                const t = App.translations[App.state.currentLang];
+                const item = App.admin.getSelectedPhotoItem();
+                const file = App.state.photoManagerFile || App.dom.get('photo-manager-file')?.files?.[0];
+                if (!item) {
+                    App.ui.info(t.toastSelectItem);
+                    return;
+                }
+                if (!file) {
+                    App.ui.info(t.toastSelectPhoto);
+                    return;
+                }
+                await App.admin.runAction(`photo-save-${item.id}`, {
+                    button: App.dom.get('save-photo-btn'),
+                    loadingText: t.loadingUpload,
+                    loadingMessage: t.loadingUpload,
+                    mutation: true,
+                }, async () => {
+                    await App.data.requireAuthForMutation();
+                    const oldUrl = item.img || '';
+                    const newUrl = await App.storage.uploadItemImage(file);
+                    const updated = await App.data.execute(
+                        'items',
+                        'update-image',
+                        { id: item.id, img_url: newUrl },
+                        App.state.db.from('items').update({ img_url: newUrl }).eq('id', item.id).select('id, img_url').maybeSingle()
+                    );
+                    App.data.ensureSavedRecord(updated, t.toastPermissionDenied);
+                    const saved = await App.data.fetchItemById(item.id);
+                    App.data.ensureSavedRecord(saved, t.toastSaveNotConfirmed);
+                    if (saved.img_url !== newUrl) throw new Error(t.toastSaveNotConfirmed);
+                    if (oldUrl && oldUrl !== newUrl) {
+                        try { await App.storage.removeItemImage(oldUrl); }
+                        catch (error) { console.warn('Old image cleanup failed:', error); App.ui.info(t.toastOldPhotoCleanupWarning); }
+                    }
+                    await App.admin.syncAfterMutation(t.toastPhotoUploaded);
+                });
+            },
+            async deleteManagedPhoto() {
+                const t = App.translations[App.state.currentLang];
+                const item = App.admin.getSelectedPhotoItem();
+                if (!item) {
+                    App.ui.info(t.toastSelectItem);
+                    return;
+                }
+                if (!item.img) {
+                    App.ui.info(t.admNoPhoto);
+                    return;
+                }
+                await App.admin.runAction(`photo-delete-${item.id}`, {
+                    button: App.dom.get('delete-photo-btn'),
+                    loadingText: t.loadingDelete,
+                    loadingMessage: t.loadingDelete,
+                    mutation: true,
+                }, async () => {
+                    await App.data.requireAuthForMutation();
+                    const oldUrl = item.img;
+                    const updated = await App.data.execute(
+                        'items',
+                        'clear-image',
+                        { id: item.id, img_url: '' },
+                        App.state.db.from('items').update({ img_url: '' }).eq('id', item.id).select('id, img_url').maybeSingle()
+                    );
+                    App.data.ensureSavedRecord(updated, t.toastPermissionDenied);
+                    const saved = await App.data.fetchItemById(item.id);
+                    App.data.ensureSavedRecord(saved, t.toastSaveNotConfirmed);
+                    if (saved.img_url) throw new Error(t.toastSaveNotConfirmed);
+                    try { await App.storage.removeItemImage(oldUrl); }
+                    catch (error) { console.warn('Image cleanup failed:', error); App.ui.info(t.toastOldPhotoCleanupWarning); }
+                    await App.admin.syncAfterMutation(t.toastPhotoDeleted);
+                });
             },
             async createCategory() {
                 const t = App.translations[App.state.currentLang];
@@ -2072,6 +2435,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                     if (existingItems.length > 0 && deletedItems.length !== existingItems.length) {
                         throw new Error(t.toastPermissionDenied);
+                    }
+                    for (const item of existingItems) {
+                        if (item.img_url) {
+                            try { await App.storage.removeItemImage(item.img_url); }
+                            catch (error) { console.warn('Category image cleanup failed:', error); }
+                        }
                     }
                     await App.data.assertNoItemsInCategory(catId);
                     const deleted = await App.data.execute(
@@ -2159,6 +2528,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                     App.data.ensureSavedRecord(deleted, t.toastPermissionDenied);
                     await App.data.assertNoItem(itemId);
+                    if (existing.img_url) {
+                        try { await App.storage.removeItemImage(existing.img_url); }
+                        catch (error) { console.warn('Deleted item image cleanup failed:', error); App.ui.info(t.toastOldPhotoCleanupWarning); }
+                    }
                     if (currentItem?.catId) await App.data.normalizeCategoryPositions(currentItem.catId);
                     await App.admin.syncAfterMutation(t.toastItemDeleted);
                 });
@@ -2364,8 +2737,40 @@ document.addEventListener('DOMContentLoaded', () => {
             App.admin.syncModeBar();
         },
 
+        mobileUi: {
+            isMobile() {
+                return window.matchMedia('(max-width: 640px)').matches;
+            },
+            update() {
+                const currentY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+                if (!App.mobileUi.isMobile()) {
+                    document.body.classList.remove('mobile-ui-hidden');
+                } else if (currentY > 10) {
+                    document.body.classList.add('mobile-ui-hidden');
+                } else {
+                    document.body.classList.remove('mobile-ui-hidden');
+                }
+                App.state.mobileScrollTicking = false;
+            },
+            onScroll() {
+                if (App.state.mobileScrollTicking) return;
+                App.state.mobileScrollTicking = true;
+                requestAnimationFrame(App.mobileUi.update);
+            },
+            onResize() {
+                App.mobileUi.update();
+            },
+        },
+
         init: {
             async once() {
+                const phoneLink = App.dom.get('contact-phone-link');
+                const phoneText = App.dom.get('contact-phone-text');
+                if (phoneLink && phoneText) {
+                    phoneText.textContent = App.config.contactPhone;
+                    phoneLink.href = `tel:${App.config.contactPhone.replace(/[^+\d]/g, '')}`;
+                }
+
                 // Restore saved language
                 const savedLang = localStorage.getItem('chill_bar_lang');
                 if (savedLang && App.translations[savedLang]) App.state.currentLang = savedLang;
@@ -2416,6 +2821,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 App.dom.get('admin-password').addEventListener('keydown', e => e.key === 'Enter' && App.auth.signIn());
                 window.addEventListener('hashchange', () => App.auth.syncAdminAccessFromUrl({ autoOpen: true }));
                 window.addEventListener('popstate', () => App.auth.syncAdminAccessFromUrl({ autoOpen: true }));
+                App.mobileUi.update();
+                window.addEventListener('scroll', App.mobileUi.onScroll, { passive: true });
+                window.addEventListener('resize', App.mobileUi.onResize);
             },
         },
 
@@ -2452,6 +2860,47 @@ document.addEventListener('DOMContentLoaded', () => {
         toastItemNameSaved: 'Yemək adı yadda saxlanıldı.',
         toastCategoryNameSaved: 'Kateqoriya adı yadda saxlanıldı.',
         toastNameRequired: 'Ad boş ola bilməz.',
+    });
+
+
+    Object.assign(App.translations.ru, {
+        admBlockPhotoManager: 'Управление блюдами / Фото блюд',
+        admBtnSavePhoto: 'Сохранить изменения',
+        admBtnDeletePhoto: 'Удалить фото',
+        admCurrentPhoto: 'Текущее фото блюда.',
+        admNoPhoto: 'У блюда нет фото.',
+        toastPhotoUploaded: 'Фото загружено.',
+        toastPhotoDeleted: 'Фото удалено.',
+        toastSelectItem: 'Выберите блюдо.',
+        toastSelectPhoto: 'Выберите фото для загрузки.',
+        toastImageValidationError: 'Поддерживаются JPG, PNG, WEBP до 5 MB.',
+        toastOldPhotoCleanupWarning: 'Фото сохранено, но старый файл не удалось удалить из Storage.',
+    });
+    Object.assign(App.translations.en, {
+        admBlockPhotoManager: 'Dish Management / Dish Photos',
+        admBtnSavePhoto: 'Save changes',
+        admBtnDeletePhoto: 'Delete photo',
+        admCurrentPhoto: 'Current dish photo.',
+        admNoPhoto: 'This dish has no photo.',
+        toastPhotoUploaded: 'Photo uploaded.',
+        toastPhotoDeleted: 'Photo deleted.',
+        toastSelectItem: 'Select a dish.',
+        toastSelectPhoto: 'Select a photo to upload.',
+        toastImageValidationError: 'JPG, PNG, WEBP up to 5 MB are supported.',
+        toastOldPhotoCleanupWarning: 'Photo saved, but the old Storage file could not be removed.',
+    });
+    Object.assign(App.translations.az, {
+        admBlockPhotoManager: 'Yeməklərin idarəsi / Şəkillər',
+        admBtnSavePhoto: 'Dəyişiklikləri saxla',
+        admBtnDeletePhoto: 'Şəkli sil',
+        admCurrentPhoto: 'Yeməyin cari şəkli.',
+        admNoPhoto: 'Bu yeməyin şəkli yoxdur.',
+        toastPhotoUploaded: 'Şəkil yükləndi.',
+        toastPhotoDeleted: 'Şəkil silindi.',
+        toastSelectItem: 'Yemək seçin.',
+        toastSelectPhoto: 'Yükləmək üçün şəkil seçin.',
+        toastImageValidationError: '5 MB-a qədər JPG, PNG, WEBP dəstəklənir.',
+        toastOldPhotoCleanupWarning: 'Şəkil saxlandı, amma köhnə Storage faylını silmək olmadı.',
     });
 
     async function initializeSupabase() {
