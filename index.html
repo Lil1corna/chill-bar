@@ -37,7 +37,7 @@
   --menu-card-photo-border: rgba(243,192,107,0.11);
   --menu-photo-bg: radial-gradient(circle at 50% 35%, rgba(243,192,107,0.13), transparent 44%), linear-gradient(135deg, rgba(255,255,255,0.08), rgba(243,192,107,0.035)), #080a10;
   --menu-photo-overlay: linear-gradient(to bottom, rgba(4,6,10,0.08) 0%, rgba(6,8,14,0.24) 56%, rgba(6,8,14,0.62) 100%), radial-gradient(circle at 18% 15%, rgba(243,192,107,0.13), transparent 34%);
-  --menu-photo-backdrop-opacity: 0.26;
+  --menu-photo-backdrop-opacity: 0.62;
   --menu-photo-backdrop-filter: blur(20px) saturate(0.8) brightness(0.72);
   --menu-card-panel-bg: linear-gradient(180deg, rgba(7,10,18,0.92), rgba(5,7,12,0.98)), rgba(10,10,10,0.96);
   --menu-card-panel-border: rgba(243,192,107,0.13);
@@ -84,7 +84,7 @@ body.light {
   --menu-card-photo-border: rgba(170,120,24,0.22);
   --menu-photo-bg: radial-gradient(circle at 50% 36%, rgba(243,192,107,0.16), transparent 46%), linear-gradient(135deg, rgba(255,255,255,0.98), rgba(243,192,107,0.08)), #f7f4ed;
   --menu-photo-overlay: linear-gradient(to bottom, rgba(255,255,255,0.02) 0%, rgba(250,248,243,0.16) 60%, rgba(250,248,243,0.4) 100%), radial-gradient(circle at 18% 15%, rgba(243,192,107,0.16), transparent 34%);
-  --menu-photo-backdrop-opacity: 0.16;
+  --menu-photo-backdrop-opacity: 0.34;
   --menu-photo-backdrop-filter: blur(22px) saturate(0.72) brightness(1.24) contrast(0.86);
   --menu-card-panel-bg: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,248,243,0.96)), rgba(255,255,255,0.96);
   --menu-card-panel-border: rgba(170,120,24,0.18);
@@ -340,8 +340,10 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   background: var(--menu-card-photo-bg);
   border-color: var(--menu-card-photo-border);
 }
-.menu-photo {
+.menu-photo,
+.menu-photo-frame {
   position: relative;
+  width: 100%;
   height: clamp(168px, 22vw, 218px);
   overflow: hidden;
   background: var(--menu-photo-bg);
@@ -373,11 +375,13 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   width: calc(100% + 36px);
   height: calc(100% + 36px);
   object-fit: cover;
+  object-position: center;
   opacity: var(--menu-photo-backdrop-opacity);
   filter: var(--menu-photo-backdrop-filter);
   transform: scale(1.06);
   transition: opacity 0.28s ease, filter 0.28s ease;
 }
+.menu-photo-main,
 .menu-photo-img {
   position: relative;
   z-index: 2;
@@ -385,6 +389,7 @@ body.light .hero-fade { background: linear-gradient(to top, #f4f2ed, transparent
   height: 100%;
   display: block;
   object-fit: contain;
+  object-position: center;
   padding: 0.7rem;
   transform: scale(1);
   filter: saturate(0.96) contrast(1.04);
@@ -1008,16 +1013,19 @@ body.light .item-desc { color: var(--menu-card-desc-color); }
     padding: 0;
     border-radius: 0.9rem;
   }
-  .menu-photo {
+  .menu-photo,
+  .menu-photo-frame {
     height: auto;
     aspect-ratio: 1 / 1;
   }
-  .menu-photo-img,
   .menu-photo-backdrop {
     object-fit: cover;
   }
+  .menu-photo-main,
   .menu-photo-img {
-    padding: 0;
+    object-fit: contain;
+    object-position: center;
+    padding: 0.35rem;
   }
   .menu-photo-backdrop {
     inset: 0;
@@ -1228,7 +1236,6 @@ document.addEventListener('DOMContentLoaded', () => {
             pendingActions: new Set(),
             loadingCount: 0,
             isAdminUrlAccess: false,
-            lastMobileScrollY: 0,
             mobileScrollTicking: false,
             photoManagerSelectedId: '',
             photoManagerFile: null,
@@ -1785,10 +1792,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (hasPhoto) {
                     card.innerHTML = `
-                        <div class="menu-photo">
+                        <div class="menu-photo menu-photo-frame">
                             ${dragHandle}
                             <img src="${u.sanitize(item.img)}" loading="lazy" class="menu-photo-backdrop" alt="" aria-hidden="true">
-                            <img src="${u.sanitize(item.img)}" loading="lazy" class="menu-photo-img" alt="${u.sanitize(item.name)}">
+                            <img src="${u.sanitize(item.img)}" loading="lazy" class="menu-photo-main menu-photo-img" alt="${u.sanitize(item.name)}">
                         </div>
                         <div class="menu-card-body">
                             <div style="min-width:0">
@@ -2737,16 +2744,13 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             update() {
                 const currentY = Math.max(0, window.scrollY || window.pageYOffset || 0);
-                const lastY = App.state.lastMobileScrollY || 0;
-                const isDown = currentY > lastY;
-                if (!App.mobileUi.isMobile() || currentY < 20) {
+                if (!App.mobileUi.isMobile()) {
                     document.body.classList.remove('mobile-ui-hidden');
-                } else if (isDown && currentY > 40) {
+                } else if (currentY > 10) {
                     document.body.classList.add('mobile-ui-hidden');
-                } else if (!isDown) {
+                } else {
                     document.body.classList.remove('mobile-ui-hidden');
                 }
-                App.state.lastMobileScrollY = currentY;
                 App.state.mobileScrollTicking = false;
             },
             onScroll() {
@@ -2755,10 +2759,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 requestAnimationFrame(App.mobileUi.update);
             },
             onResize() {
-                if (!App.mobileUi.isMobile()) {
-                    document.body.classList.remove('mobile-ui-hidden');
-                }
-                App.state.lastMobileScrollY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+                App.mobileUi.update();
             },
         },
 
@@ -2821,7 +2822,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 App.dom.get('admin-password').addEventListener('keydown', e => e.key === 'Enter' && App.auth.signIn());
                 window.addEventListener('hashchange', () => App.auth.syncAdminAccessFromUrl({ autoOpen: true }));
                 window.addEventListener('popstate', () => App.auth.syncAdminAccessFromUrl({ autoOpen: true }));
-                App.state.lastMobileScrollY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+                App.mobileUi.update();
                 window.addEventListener('scroll', App.mobileUi.onScroll, { passive: true });
                 window.addEventListener('resize', App.mobileUi.onResize);
             },
