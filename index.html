@@ -2254,6 +2254,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     App.ui.info(App.translations[App.state.currentLang].toastImageValidationError);
                     return;
                 }
+                App.state.photoManagerFile = file;
                 const previewUrl = URL.createObjectURL(file);
                 preview.innerHTML = `<img src="${previewUrl}" alt="">`;
                 const image = preview.querySelector('img');
